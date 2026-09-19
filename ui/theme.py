@@ -42,6 +42,10 @@ STATUS_COLOR = {
 }
 
 
+def status_color(label: str) -> str:
+    return STATUS_COLOR.get(str(label).upper(), COLORS["gray"])
+
+
 def css() -> str:
     c = COLORS
     return f"""

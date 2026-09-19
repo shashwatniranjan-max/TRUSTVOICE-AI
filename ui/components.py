@@ -2,7 +2,7 @@
 
 from html import escape
 
-from ui.theme import STATUS_COLOR, COLORS
+from ui.theme import COLORS, status_color
 
 
 def render(st, html: str):
@@ -10,10 +10,6 @@ def render(st, html: str):
         st.html(html)
     else:
         st.markdown(html, unsafe_allow_html=True)
-
-
-def status_color(label: str) -> str:
-    return STATUS_COLOR.get(str(label).upper(), COLORS["gray"])
 
 
 def meter(value: int, color: str | None = None) -> str:
