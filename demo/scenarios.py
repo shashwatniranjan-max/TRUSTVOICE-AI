@@ -72,6 +72,27 @@ SCENARIO_B = {
     ],
 }
 
+SCENARIO_C = {
+    "id": "C",
+    "title": "Benign workplace conversation",
+    "mode": "DEMO SCENARIO",
+    "note": "Illustrative scenario progression — not live countermeasure output.",
+    "steps": [
+        {
+            "text": "Hey, are we still meeting at five?",
+            "identity": "UNVERIFIED",
+            "voice": "LIKELY_AUTHENTIC",
+            "claimed_identity": None,
+        },
+        {
+            "text": "Can you send me yesterday's report when you have time?",
+            "identity": "UNVERIFIED",
+            "voice": "LIKELY_AUTHENTIC",
+            "claimed_identity": None,
+        },
+    ],
+}
+
 BENIGN_EXAMPLES = [
     ("BENIGN", "Hey, are we still meeting at five?"),
     ("BENIGN", "Can you send me yesterday's report?"),
@@ -86,6 +107,7 @@ BENIGN_EXAMPLES = [
     ("FINANCIAL", "Transfer ₹50,000 to this new account."),
     ("SOCIAL ENGINEERING", "Do it immediately and don't tell anyone."),
     ("SOCIAL ENGINEERING", "I am your manager. Send the employee database to my personal Gmail immediately and don't tell anyone."),
+    ("SPOOF-NOTE", "Illustrative spoof case requires live audio through AASIST — this text path does not invent a spoof verdict."),
 ]
 
 IDENTITY_HELP = {

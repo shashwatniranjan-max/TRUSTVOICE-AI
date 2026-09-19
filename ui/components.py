@@ -24,16 +24,19 @@ def decision_block(result: dict) -> str:
     action = result.get("action") or "—"
     voice = result.get("voice_display") or "UNAVAILABLE"
     identity = result.get("identity_status") or "NOT_AVAILABLE"
+    intent = ((result.get("intent") or {}).get("intent") or "—")
+    source = result.get("source") or "—"
     rc = status_color(risk)
     return f"""
     <div class="tv-panel">
-      <div class="tv-kicker">Current decision</div>
+      <div class="tv-kicker">Mode · {escape(str(source))}</div>
       <div class="tv-value">{score} <span class="tv-muted">/ 100</span></div>
       {meter(score, rc)}
       <div class="tv-label" style="color:{rc}">{escape(str(risk))} RISK · {escape(str(action))}</div>
+      <div class="tv-row"><span>Intent</span><span>{escape(str(intent).replace('_', ' '))}</span></div>
       <div class="tv-row"><span>Voice authenticity</span><span>{escape(str(voice))}</span></div>
       <div class="tv-row"><span>Identity</span><span>{escape(str(identity).replace('_', ' '))}</span></div>
-      <div class="tv-muted" style="margin-top:8px">Dynamic Trust Score is a decision-support value, not a probability.</div>
+      <div class="tv-muted" style="margin-top:8px">Dynamic Trust Score is decision support, not a probability. Voice authenticity ≠ identity ≠ authorization.</div>
     </div>
     """
 

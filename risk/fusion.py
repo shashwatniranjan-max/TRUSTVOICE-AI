@@ -161,11 +161,17 @@ def recommended_action(
     )
 
 
-def authenticity_display(label: str) -> str:
-    return {
+def authenticity_display(label: str, evidence_kind: str = "", source: str = "") -> str:
+    base = {
         "LIKELY_AUTHENTIC": "LIKELY AUTHENTIC",
         "LIKELY_SPOOF": "LIKELY SPOOF",
         "INCONCLUSIVE": "INCONCLUSIVE",
         "INCONCLUSIVE_QUALITY": "INCONCLUSIVE / AUDIO QUALITY",
         "UNAVAILABLE": "UNAVAILABLE",
     }.get(label, label.replace("_", " "))
+    demo = source == "DEMO SCENARIO" or evidence_kind == "illustrative"
+    if demo and label != "UNAVAILABLE":
+        return f"{base} (illustrative demo input — not a live model verdict)"
+    if evidence_kind == "model":
+        return f"{base} (model-derived countermeasure score — not a calibrated probability)"
+    return base

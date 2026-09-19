@@ -27,19 +27,31 @@ def analyse_context(
     penalty = 0
     state = conversation_state or {}
 
-    off_channel = bool(grouped.get("DESTINATION")) or any(
-        p in clean for p in ("personal email", "personal gmail", "gmail.com", "yahoo.com")
+    personal_channel = any(
+        p in clean for p in (
+            "personal email", "personal gmail", "personal account",
+            "new bank account",
+        )
     )
-    new_account = "new account" in clean or "different account" in clean
+    email_destination = bool(grouped.get("EMAIL")) and any(
+        v in clean for v in ("send", "mail", "forward", "export")
+    )
+    off_channel = personal_channel or email_destination
+    new_account = (
+        "new account" in clean
+        or "different account" in clean
+        or "new bank account" in clean
+        or (intent == "financial_request" and "this account" in clean)
+    )
     sensitive_doc = bool(grouped.get("DOCUMENT")) and any(
         x in clean for x in ("database", "kyc", "salary", "payroll", "confidential")
     )
-    financial = intent == "financial_request" or bool(grouped.get("AMOUNT"))
+    financial = intent == "financial_request"
     credential = intent == "credential_request"
     authority = bool(grouped.get("PERSON_ROLE")) or "calling from" in clean
 
     prior_intents = state.get("intents") or []
-    prior_sensitive = any(i in SENSITIVE_INTENTS for i in prior_intents)
+    prior_sensitive = any(i in SENSITIVE_INTENTS for i in prior_intents[-3:])
 
     if identity_status in {"UNVERIFIED", "NOT_AVAILABLE"} and not (
         intent in SENSITIVE_INTENTS or financial or credential

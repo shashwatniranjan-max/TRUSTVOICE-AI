@@ -17,6 +17,7 @@ EMPTY_CONVERSATION = {
     "previous_events": [],
     "current_risk": "LOW",
     "trust_scores": [],
+    "active_concern": False,
 }
 
 
@@ -50,6 +51,19 @@ def update_conversation_state(state: dict | None, utterance: dict) -> dict:
     state["requested_action"] = intent or state.get("requested_action")
     state["current_risk"] = utterance.get("interaction_risk", state.get("current_risk"))
     state["trust_scores"].append(utterance.get("trust_score"))
+    retracting = bool(
+        (utterance.get("intent") or {}).get("linguistic_guards", {}).get("last_utterance_retracts")
+    )
+    if retracting and intent in {
+        "normal_conversation", "security_support", "account_information",
+    }:
+        state["requested_action"] = intent
+        state["active_concern"] = False
+    elif intent in {
+        "credential_request", "financial_request", "sensitive_data_request",
+        "personal_information_request",
+    }:
+        state["active_concern"] = True
     state["previous_events"].append({
         "transcript": utterance.get("transcript", ""),
         "intent": intent,
@@ -57,3 +71,7 @@ def update_conversation_state(state: dict | None, utterance: dict) -> dict:
         "interaction_risk": utterance.get("interaction_risk"),
     })
     return state
+
+
+def reset_conversation_state() -> dict:
+    return new_conversation_state()

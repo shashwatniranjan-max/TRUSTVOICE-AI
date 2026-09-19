@@ -11,7 +11,8 @@ ENTITY_SPECS = [
         "AMOUNT",
         re.compile(
             r"(?:₹\s*\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|₹\s*\d+(?:\.\d+)?|"
-            r"(?:rs\.?|inr|rupees?)\s*\d{1,3}(?:,\d{2,3})+|"
+            r"(?:rs\.?|inr)\s*\d{1,3}(?:,\d{2,3})+|"
+            r"(?:rs\.?|inr)\s*\d{4,}|"
             r"\b\d{1,3}(?:,\d{2,3})+\s*(?:rupees?|rs)?|"
             r"\b(?:fifty|two|one|five)\s+(?:thousand|lakh|lac)\s+(?:rupees?)?)",
             re.I,
@@ -19,7 +20,11 @@ ENTITY_SPECS = [
     ),
     (
         "ACCOUNT",
-        re.compile(r"\b(?:account(?:\s+number)?|a/c)\s*[:#-]?\s*(\d{6,18})\b", re.I),
+        re.compile(
+            r"\b(?:account(?:\s+number)?|a/c)\s*[:#-]?\s*(\d{6,18})\b|"
+            r"\b(personal account|new bank account)\b",
+            re.I,
+        ),
     ),
     (
         "OTP",
@@ -36,7 +41,7 @@ ENTITY_SPECS = [
     (
         "BANK",
         re.compile(
-            r"\b(?:your bank|the bank|bank security|sbi|hdfc|icici|axis bank|kotak)\b",
+            r"\b(?:your bank|the bank|bank security(?: team)?|sbi|hdfc|icici|axis bank|kotak)\b",
             re.I,
         ),
     ),
@@ -47,16 +52,16 @@ ENTITY_SPECS = [
     (
         "DESTINATION",
         re.compile(
-            r"\b(?:personal (?:email|gmail|number)|gmail|yahoo|hotmail|"
-            r"new account|different account|this account)\b",
+            r"\b(?:personal (?:email|gmail|number|account)|gmail|"
+            r"new (?:bank )?account|different account|this account)\b",
             re.I,
         ),
     ),
     (
         "DOCUMENT",
         re.compile(
-            r"\b(?:employee database|customer (?:database|records|kyc)|salary sheet|"
-            r"payroll|kyc documents?|attendance report|confidential files?|"
+            r"\b(?:employee database|customer (?:database|records|kyc)|salary (?:sheet|data)|"
+            r"payroll|kyc documents?|kyc|attendance report|confidential files?|"
             r"client contact list|audit report)\b",
             re.I,
         ),
@@ -64,8 +69,9 @@ ENTITY_SPECS = [
     (
         "PERSON_ROLE",
         re.compile(
-            r"\b(?:your manager|i am (?:your )?manager|from (?:your )?bank|"
-            r"security (?:department|team)|ceo|hr|fraud team)\b",
+            r"\b(?:your manager|i am (?:your )?manager|\bmanager\b|"
+            r"from (?:your )?bank|security (?:department|team)|bank security team|"
+            r"\bceo\b|\bhr\b|fraud team)\b",
             re.I,
         ),
     ),

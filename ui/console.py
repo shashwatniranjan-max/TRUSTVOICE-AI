@@ -4,7 +4,7 @@ from html import escape
 
 import streamlit as st
 
-from demo.scenarios import BENIGN_EXAMPLES, IDENTITY_HELP, SCENARIO_A, SCENARIO_B
+from demo.scenarios import BENIGN_EXAMPLES, IDENTITY_HELP, SCENARIO_A, SCENARIO_B, SCENARIO_C
 from models.antispoof import MODEL_REGISTRY, analyze_audio_bytes
 from models.intent import intent_display_name
 from risk.pipeline import analyse_interaction
@@ -55,6 +55,11 @@ def render_topbar():
 
 def render_console():
     render_topbar()
+    source = st.session_state.get("analysis_source") or "Idle"
+    if source.startswith("DEMO"):
+        st.info("DEMO SCENARIO — scripted transcript and illustrative voice labels. Not a live AASIST verdict.")
+    elif source.startswith("LIVE"):
+        st.info("LIVE / MANUAL ANALYSIS — anti-spoofing runs on uploaded/microphone audio when provided. Transcript is typed (ASR is not bundled).")
     result = st.session_state.get("last_result")
     audio = st.session_state.get("last_analysis") or {}
     anti = (audio or {}).get("anti_spoof") or {}
@@ -140,7 +145,8 @@ def render_console():
                     identity_status=identity,
                     authenticity_score=auth_score,
                     conversation_state=st.session_state.conversation_state,
-                    source="LIVE / UPLOADED ANALYSIS",
+                    source="LIVE / MANUAL ANALYSIS",
+                    voice_evidence="model" if auth_score is not None else "unavailable",
                 )
                 _apply_result(analysed, "LIVE / UPLOADED ANALYSIS", audio_result)
                 st.rerun()
@@ -223,27 +229,31 @@ def render_console():
         render(st, '<div class="tv-section">Trust handshake</div>')
         render(st, f"""
         <div class="tv-alert">
-          <div class="tv-kicker">Trust handshake required · demo / simulated</div>
+          <div class="tv-kicker">Simulated Trust Handshake</div>
           <div class="tv-label">Voice identity alone is not sufficient authorization for this action.</div>
           <div class="tv-muted" style="margin-top:6px">{escape(result.get('action_detail', ''))}</div>
-          <div class="tv-muted">Verification request sent to registered device (simulated — this prototype does not contact a telecom or device service).</div>
+          <div class="tv-muted">Verification request sent to registered device — simulated. This prototype does not contact a phone, bank, telecom provider, or device service. YES continues, NO stops, no response keeps the action blocked.</div>
         </div>
         """)
-        h1, h2 = st.columns(2)
+        h1, h2, h3 = st.columns(3)
         with h1:
-            if st.button("Confirm request", use_container_width=True):
+            if st.button("Confirm request (simulated YES)", use_container_width=True):
                 st.session_state.handshake_result = {
                     "status": "CONFIRMED",
-                    "message": "Demo confirmation on a trusted channel.",
+                    "message": "Simulated confirmation on a trusted channel. Sensitive action may continue.",
                 }
-                st.success("Demo handshake confirmed.")
         with h2:
-            if st.button("Deny request", use_container_width=True):
+            if st.button("Deny request (simulated NO)", use_container_width=True):
                 st.session_state.handshake_result = {
                     "status": "DENIED",
-                    "message": "Demo denial on a trusted channel.",
+                    "message": "Simulated denial. Sensitive action remains blocked.",
                 }
-                st.error("Demo handshake denied. Sensitive action should remain blocked.")
+        with h3:
+            if st.button("No response (remain blocked)", use_container_width=True):
+                st.session_state.handshake_result = {
+                    "status": "NO_RESPONSE",
+                    "message": "No independent confirmation. Sensitive action remains blocked pending manual verification.",
+                }
         if st.session_state.handshake_result:
             st.info(
                 f"{st.session_state.handshake_result['status']}: "
@@ -278,13 +288,15 @@ def render_console():
 
 def render_demo():
     render_topbar()
-    st.caption("Demo scenarios use the interaction engine on scripted dialogue. They are not live anti-spoof measurements.")
-    a, b, c = st.columns(3)
+    st.caption("DEMO SCENARIO buttons use scripted dialogue and illustrative voice labels. They are not live anti-spoof measurements.")
+    a, b, c, d = st.columns(4)
     with a:
         run_a = st.button("Scenario A · unknown caller", use_container_width=True)
     with b:
-        run_b = st.button("Scenario B · verified + dangerous request", use_container_width=True)
+        run_b = st.button("Scenario B · verified + dangerous", use_container_width=True)
     with c:
+        run_c = st.button("Scenario C · benign", use_container_width=True)
+    with d:
         reset = st.button("Reset session", use_container_width=True)
 
     if reset:
@@ -302,6 +314,8 @@ def render_demo():
         _run_scenario(SCENARIO_A, slot)
     if run_b:
         _run_scenario(SCENARIO_B, slot)
+    if run_c:
+        _run_scenario(SCENARIO_C, slot)
 
     render(st, '<div class="tv-section">Benign / contrast examples</div>')
     st.caption("These buttons run the live interaction pipeline on fixed sentences so judges can see false-positive behaviour.")
@@ -309,12 +323,13 @@ def render_demo():
         if st.button(f"{kind}: {text}", key=f"ex_{i}", use_container_width=True):
             analysed = analyse_interaction(
                 transcript=text,
-                voice_label="LIKELY_AUTHENTIC",
+                voice_label="UNAVAILABLE" if kind == "SPOOF-NOTE" else "LIKELY_AUTHENTIC",
                 identity_status="UNVERIFIED",
-                source="LIVE / UPLOADED ANALYSIS",
+                source="LIVE / MANUAL ANALYSIS",
+                voice_evidence="illustrative",
                 conversation_state=new_conversation_state(),
             )
-            _apply_result(analysed, "LIVE / UPLOADED ANALYSIS")
+            _apply_result(analysed, "LIVE / MANUAL ANALYSIS")
             st.rerun()
 
     if st.session_state.get("last_result"):
@@ -334,6 +349,7 @@ def _run_scenario(spec, slot):
             claimed_identity=step.get("claimed_identity"),
             conversation_state=state,
             source="DEMO SCENARIO",
+            voice_evidence="illustrative",
         )
         state = last["conversation_state"]
         slot.markdown(

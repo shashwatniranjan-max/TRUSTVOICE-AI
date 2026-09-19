@@ -221,8 +221,8 @@ def run_antispoof_scores(audio, sample_rate: int, model_key: str, allow_download
         "aggregation": "mean of per-window countermeasure logits (speech-bearing windows)",
         "preprocessing": "raw mono float32 @ 16 kHz, no normalisation, fixed windows",
         "score_note": (
-            "Authenticity score is a countermeasure estimate, not a calibrated probability "
-            "and not a guarantee of authenticity."
+            "Authenticity score is a model-derived countermeasure score — not a "
+            "calibrated probability and not a guarantee of authenticity."
         ),
     }
 
@@ -266,6 +266,9 @@ def derive_verdict(
     anti["decision_band"] = round(float(band), 4)
     anti["threshold_source"] = threshold_source
     anti["authenticity_score"] = int(round(score01 * 100))
+    anti["display_note"] = (
+        "Model-derived countermeasure score — not a calibrated probability."
+    )
     return anti
 
 

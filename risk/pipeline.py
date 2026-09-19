@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from models.entities import extract_entities
 from models.intent import classify_intent, intent_safety_score
 from risk.behaviour import analyse_behaviour
@@ -18,6 +20,18 @@ from risk.fusion import (
 )
 from utils.state import new_conversation_state, update_conversation_state
 
+SENSITIVE_INTENTS = {
+    "credential_request",
+    "financial_request",
+    "sensitive_data_request",
+    "personal_information_request",
+}
+
+PRESSURE_ONLY = re.compile(
+    r"\b(immediately|right now|do it|don't tell anyone|blocked|hurry)\b",
+    re.I,
+)
+
 
 def analyse_interaction(
     transcript: str = "",
@@ -27,6 +41,7 @@ def analyse_interaction(
     conversation_state: dict | None = None,
     claimed_identity: str | None = None,
     source: str = "LIVE",
+    voice_evidence: str = "unavailable",
 ) -> dict:
     """
     Analyse one utterance (and accumulated conversation state).
@@ -34,8 +49,26 @@ def analyse_interaction(
     Voice authenticity and interaction risk are computed separately, then
     combined only at the fusion / gate layer.
     """
+    if source == "DEMO SCENARIO" and voice_evidence == "unavailable":
+        voice_evidence = "illustrative"
     state = conversation_state or new_conversation_state()
     intent = classify_intent(transcript)
+    guards = intent.get("linguistic_guards") or {}
+    prior_action = state.get("requested_action")
+    continuation = (
+        intent.get("intent") in {"normal_conversation", "unknown"}
+        and prior_action in SENSITIVE_INTENTS
+        and not guards.get("last_utterance_retracts")
+        and PRESSURE_ONLY.search(transcript or "")
+    )
+    if continuation:
+        intent = dict(intent)
+        intent["intent"] = prior_action
+        intent["override"] = (
+            "Current turn continues an earlier sensitive request under pressure "
+            "(history used as context, not as a permanent verdict)"
+        )
+
     entities = extract_entities(transcript)
     behaviour = analyse_behaviour(transcript, intent.get("intent"))
     context = analyse_context(
@@ -69,6 +102,14 @@ def analyse_interaction(
         "new_destination": context.get("new_destination"),
     }
     gated, caps, forced_risk = apply_safety_gates(fused, evidence)
+    if guards.get("last_utterance_retracts") and intent.get("intent") not in SENSITIVE_INTENTS:
+        # Clarification / advice can lower risk; keep a small residual note only.
+        forced_risk = None
+        caps = [c for c in caps if "credential" not in c.lower()]
+        residual = 6 if state.get("active_concern") else 0
+        gated = int(min(96, gated + (8 if residual else 0)))
+        if residual:
+            caps.append("Earlier turn raised a concern; current turn appears to retract or clarify it")
     risk, action_code = trust_band(gated)
     if forced_risk:
         rank = {"LOW": 0, "ELEVATED": 1, "HIGH": 2, "CRITICAL": 3}
@@ -104,7 +145,7 @@ def analyse_interaction(
         "fused_uncapped": fused,
         "interaction_risk": risk,
         "voice_label": voice_label,
-        "voice_display": authenticity_display(voice_label),
+        "voice_display": authenticity_display(voice_label, evidence_kind=voice_evidence, source=source),
         "identity_status": identity_status,
         "action": action_code,
         "action_detail": action_detail,

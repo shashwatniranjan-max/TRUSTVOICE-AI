@@ -59,20 +59,56 @@ ADVICE_PATTERNS = [
     r"\b(hang up|report|awareness|phishing|scam)\b",
     r"\bkabhi (otp|password).{0,12}(mat|nahi)\b",
     r"\bbank kabhi otp nahi\b",
+    r"\b(told me never|said never|remember,? never)\b",
+    r"\bnever transfer money\b",
+    r"\bdon't send money\b",
+    r"\bdo not send money\b",
 ]
 
 PAST_OR_REPORT_PATTERNS = [
-    r"\b(someone (asked|tried|called)|tried to (steal|scam|phish))\b",
-    r"\b(yesterday|last (night|week)|already)\b.{0,40}\b(otp|password|pin)\b",
-    r"\b(otp|password|pin)\b.{0,40}\b(yesterday|last (night|week))\b",
-    r"\b(i (received|got) (an |the )?(otp|code))\b",
+    r"\b(someone (asked|tried|called)|tried to (steal|scam|phish)|the scammer)\b",
+    r"\b(yesterday|last (night|week)|already)\b.{0,40}\b(otp|password|pin|payment|bank details)\b",
+    r"\b(otp|password|pin|payment|bank details)\b.{0,40}\b(yesterday|last (night|week))\b",
+    r"\b(i (received|got) (an |the |my )?(otp|code|salary))\b",
     r"\b(did you receive (the )?(otp|code|sms))\b",
     r"\b(the otp (came|arrived))\b",
+    r"\b(he threatened me|threatened me for)\b",
+    r"\b(i (already )?(gave|sent|made) (the |a )?(payment|otp|money))\b",
+]
+
+CLARIFICATION_PATTERNS = [
+    r"\b(i meant|no[, ]+i meant|that is not what i meant|publicly available|from the website)\b",
+    r"\b(i am not asking|i'm not asking|not asking for)\b",
+    r"\b(i will not share|i won't share|i forgot my password|reset my password)\b",
 ]
 
 NEGATION_WINDOW = re.compile(
     r"(never|not|don't|do not|didn't|did not|won't|will not|nahi|mat)\b.{0,50}"
     + CREDENTIAL_LEX,
+    re.I,
+)
+
+FINANCIAL_TRANSFER = re.compile(
+    r"\b(transfer|wire|neft|imps|send (the )?money|send ₹|send rs)\b.{0,60}"
+    r"\b(to (this|the new|my personal|a new)|to account)\b",
+    re.I,
+)
+
+FINANCIAL_NEGATION = re.compile(
+    r"\b(don't|do not|never|not)\b.{0,40}\b(send money|transfer|wire)\b",
+    re.I,
+)
+
+SELF_PASSWORD = re.compile(
+    r"\b(i forgot my password|reset my password|change my password)\b",
+    re.I,
+)
+
+BENIGN_BALANCE = re.compile(
+    r"\b(account balance|bank balance|my salary|payment was successful|explain neft|"
+    r"when will my salary|i made a upi|bank account is frozen|"
+    r"update my bank details|received ₹|received rs|received inr|"
+    r"i sent ₹|i sent rs)\b",
     re.I,
 )
 
@@ -127,18 +163,31 @@ def credential_terms_in(text: str):
     return found
 
 
+def _is_retract(sent: str) -> bool:
+    return bool(
+        any(re.search(p, sent, flags=re.I) for p in ADVICE_PATTERNS)
+        or any(re.search(p, sent, flags=re.I) for p in PAST_OR_REPORT_PATTERNS)
+        or any(re.search(p, sent, flags=re.I) for p in CLARIFICATION_PATTERNS)
+        or NEGATION_WINDOW.search(sent)
+        or FINANCIAL_NEGATION.search(sent)
+        or SELF_PASSWORD.search(sent)
+    )
+
+
 def linguistic_context(text: str) -> dict:
     """Explainable heuristics around credential language. Not an LLM."""
     clean = clean_text(text)
     sentences = split_utterances(clean)
-    advice, past, solicitation, negated = [], [], [], []
+    advice, past, solicitation, negated, clarifications = [], [], [], [], []
 
     for sent in sentences:
         if any(re.search(p, sent, flags=re.I) for p in ADVICE_PATTERNS):
             advice.append(sent)
         if any(re.search(p, sent, flags=re.I) for p in PAST_OR_REPORT_PATTERNS):
             past.append(sent)
-        if NEGATION_WINDOW.search(sent):
+        if any(re.search(p, sent, flags=re.I) for p in CLARIFICATION_PATTERNS):
+            clarifications.append(sent)
+        if NEGATION_WINDOW.search(sent) or FINANCIAL_NEGATION.search(sent):
             negated.append(sent)
 
         solicit = re.search(
@@ -147,42 +196,57 @@ def linguistic_context(text: str) -> dict:
             sent,
             flags=re.I,
         )
-        if solicit and not NEGATION_WINDOW.search(sent):
-            if not any(re.search(p, sent, flags=re.I) for p in ADVICE_PATTERNS):
-                solicitation.append(sent)
+        if solicit and not _is_retract(sent):
+            solicitation.append(sent)
 
-        # Imperative short forms: "Send the OTP." / "Share the OTP."
         if re.search(
             rf"^\s*{SOLICIT_VERBS}\s+(me\s+|us\s+)?(the\s+|your\s+|an\s+)?{CREDENTIAL_LEX}",
             sent,
             flags=re.I,
-        ) and not NEGATION_WINDOW.search(sent):
+        ) and not _is_retract(sent):
             if sent not in solicitation:
                 solicitation.append(sent)
+
+    last = sentences[-1] if sentences else ""
+    last_retracts = bool(last and _is_retract(last))
+    force_cred = bool(solicitation) and not last_retracts
+    force_sensitive = bool(SENSITIVE_SOLICIT.search(clean)) and not last_retracts
+    if last_retracts and clarifications:
+        force_sensitive = False
+    force_financial = bool(FINANCIAL_TRANSFER.search(clean)) and not last_retracts
+    if FINANCIAL_NEGATION.search(clean) and last_retracts:
+        force_financial = False
 
     return {
         "advice_or_warning": advice,
         "past_or_report": past,
         "direct_solicitation": solicitation,
         "negated_credential": negated,
-        "suppress_credential_hard_rule": bool(advice or past or negated) and not solicitation,
-        "force_credential_request": bool(solicitation),
-        "force_sensitive_data_request": bool(
-            SENSITIVE_SOLICIT.search(clean)
-            and not any(re.search(p, clean, flags=re.I) for p in ADVICE_PATTERNS)
+        "clarification": clarifications,
+        "last_utterance_retracts": last_retracts,
+        "suppress_credential_hard_rule": (
+            bool(advice or past or negated or clarifications or last_retracts)
+            and not force_cred
         ),
-        "notes": _context_notes(advice, past, solicitation, negated),
+        "force_credential_request": force_cred,
+        "force_sensitive_data_request": force_sensitive,
+        "force_financial_request": force_financial,
+        "self_service_password": bool(SELF_PASSWORD.search(clean)),
+        "benign_financial_language": bool(BENIGN_BALANCE.search(clean)) and not force_financial,
+        "notes": _context_notes(advice, past, solicitation, negated, clarifications),
     }
 
 
-def _context_notes(advice, past, solicitation, negated):
+def _context_notes(advice, past, solicitation, negated, clarifications=None):
     notes = []
     if advice:
         notes.append("Credential terms appear in security-advice or warning language")
     if past:
         notes.append("Credential terms refer to a past event or report, not a live request")
     if negated:
-        notes.append("Negation around credential terms (do not / never share)")
+        notes.append("Negation around credential/payment terms (do not / never share)")
+    if clarifications:
+        notes.append("Later utterance clarifies or retracts an earlier reading")
     if solicitation:
         notes.append("Direct solicitation of a live credential")
     return notes
@@ -251,6 +315,23 @@ def classify_intent(text: str) -> dict:
 
 def _apply_guards(result: dict, guards: dict) -> dict:
     intent = result.get("intent", "unknown")
+    if guards.get("last_utterance_retracts") and guards.get("suppress_credential_hard_rule"):
+        if intent in {
+            "credential_request", "personal_information_request",
+            "financial_request", "sensitive_data_request",
+        }:
+            if guards.get("advice_or_warning") or guards.get("negated_credential"):
+                result["intent"] = "security_support"
+                result["override"] = "Latest utterance is advice, negation, or a report — not a live request"
+            elif guards.get("clarification"):
+                result["intent"] = "normal_conversation"
+                result["override"] = "Clarification / retraction of an earlier reading"
+            else:
+                result["intent"] = "normal_conversation"
+                result["override"] = "Sensitive terms without a live request"
+            result["confidence"] = max(float(result.get("confidence") or 0), 80.0)
+            return result
+
     if guards.get("force_credential_request"):
         result["intent"] = "credential_request"
         result["override"] = "Direct credential solicitation pattern"
@@ -261,6 +342,25 @@ def _apply_guards(result: dict, guards: dict) -> dict:
         result["override"] = "Sensitive dataset transfer request"
         result["confidence"] = max(float(result.get("confidence") or 0), 86.0)
         return result
+    if guards.get("force_financial_request"):
+        result["intent"] = "financial_request"
+        result["override"] = "Outbound transfer request pattern"
+        result["confidence"] = max(float(result.get("confidence") or 0), 84.0)
+        return result
+
+    if guards.get("self_service_password") and intent == "credential_request":
+        result["intent"] = "normal_conversation"
+        result["override"] = "Self-service password mention, not a request for someone else's secret"
+        return result
+
+    if guards.get("benign_financial_language") and intent == "financial_request":
+        result["intent"] = "account_information" if re.search(
+            r"\b(balance|salary|neft|upi payment|frozen|bank details)\b",
+            str(result.get("riskiest_utterance") or ""),
+            flags=re.I,
+        ) else "normal_conversation"
+        result["override"] = "Ordinary financial language, not an outbound transfer request"
+        return result
 
     if guards.get("suppress_credential_hard_rule"):
         if intent in {
@@ -268,7 +368,6 @@ def _apply_guards(result: dict, guards: dict) -> dict:
             "personal_information_request",
             "financial_request",
         }:
-            # Advice / reports should not inherit extraction-intent labels.
             if guards.get("advice_or_warning") or guards.get("negated_credential"):
                 result["intent"] = "security_support"
                 result["override"] = "Treated as security advice / warning, not a request"

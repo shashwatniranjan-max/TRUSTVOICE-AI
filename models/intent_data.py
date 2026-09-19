@@ -237,3 +237,33 @@ INTENT_TRAINING = [
 # Fix the accidental mixed example
 INTENT_TRAINING = [x for x in INTENT_TRAINING if x[1] != "Send me yesterday's report"]
 INTENT_TRAINING.append(("normal_conversation", "Send me yesterday's report."))
+INTENT_TRAINING.extend([
+    ("normal_conversation", "How are you?"),
+    ("normal_conversation", "I received my salary today."),
+    ("normal_conversation", "The payment was successful."),
+    ("normal_conversation", "I sent ₹500 to Rahul."),
+    ("normal_conversation", "I forgot my password."),
+    ("normal_conversation", "I am going to reset my password."),
+    ("normal_conversation", "Please send the report when you have time."),
+    ("account_information", "I need to check my bank balance."),
+    ("account_information", "What is my account balance?"),
+    ("account_information", "Can you explain NEFT?"),
+    ("account_information", "When will my salary arrive?"),
+    ("account_information", "I made a UPI payment."),
+    ("account_information", "My bank account is frozen."),
+    ("account_information", "I need to update my bank details."),
+    ("security_support", "The bank told me never to share my OTP."),
+    ("security_support", "Never share your OTP."),
+    ("security_support", "The bank will never ask for your PIN."),
+    ("security_support", "Don't give anyone your password."),
+    ("security_support", "Remember, never transfer money to an unknown account."),
+    ("security_support", "I will NOT share my OTP."),
+    ("security_support", "I am not asking for your password."),
+    ("security_support", "Don't send money to this account."),
+    ("security_support", "He threatened me for my password."),
+    ("security_support", "The scammer asked for my bank details."),
+    ("security_support", "I already gave the payment yesterday."),
+    ("credential_request", "Tell me your OTP."),
+    ("credential_request", "Send me your UPI PIN."),
+    ("credential_request", "Give me your password."),
+])
