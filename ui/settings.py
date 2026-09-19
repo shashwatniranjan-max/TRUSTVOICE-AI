@@ -3,13 +3,14 @@
 import streamlit as st
 
 from models.antispoof import MODEL_DIR, MODEL_REGISTRY
+from models.asr import asr_model_name
 from ui.components import render
 from ui.console import render_topbar
 
 
 def render_settings():
     render_topbar()
-    render(st, '<div class="tv-section">Settings</div>')
+    render(st, '<div class="tv-section" style="margin-top:0">Settings</div>')
     st.caption(
         "The default 0.50 threshold is a prototype starting point, not a calibrated probability. "
         "Use the evaluation lab when you have labelled REAL_ and SPOOF_ files."
@@ -52,19 +53,21 @@ def render_settings():
         st.info("Threshold not calibrated — using prototype default.")
 
     render(st, f"""
-    <div class="tv-panel">
-      <div class="tv-row"><span>Model</span><span>{MODEL_REGISTRY[st.session_state.model_choice]['label']}</span></div>
-      <div class="tv-row"><span>Threshold</span><span>{st.session_state.bona_threshold:.3f}</span></div>
-      <div class="tv-row"><span>Decision band</span><span>±{st.session_state.decision_band:.3f}</span></div>
-      <div class="tv-row"><span>Threshold source</span><span>{src}</span></div>
-      <div class="tv-row"><span>Model directory</span><span>{MODEL_DIR}</span></div>
-      <div class="tv-row"><span>Execution</span><span>CPU · 1 thread · sequential</span></div>
-    </div>
+    <table class="tv-table">
+      <tr><td>Model</td><td>{MODEL_REGISTRY[st.session_state.model_choice]['label']}</td></tr>
+      <tr><td>Threshold</td><td class="num">{st.session_state.bona_threshold:.3f}</td></tr>
+      <tr><td>Decision band</td><td class="num">±{st.session_state.decision_band:.3f}</td></tr>
+      <tr><td>Threshold source</td><td>{src}</td></tr>
+      <tr><td>ASR model</td><td>{asr_model_name()} (TRUSTVOICE_ASR_MODEL)</td></tr>
+      <tr><td>Model directory</td><td>{MODEL_DIR}</td></tr>
+      <tr><td>Execution</td><td>CPU · 1 thread · sequential</td></tr>
+    </table>
     """)
     st.caption(MODEL_REGISTRY[st.session_state.model_choice]["note"])
     st.caption(
         "Prototype processing is local to the application environment. Voice/audio data should "
         "be treated as sensitive and retained only as long as necessary. Set TRUSTVOICE_MODEL_PATH "
-        "to run fully offline. This prototype does not intercept ordinary cellular calls and does "
+        "to run fully offline. Set TRUSTVOICE_ASR_MODEL (default tiny) for local Whisper ASR. "
+        "This prototype does not intercept ordinary cellular calls and does "
         "not enroll a production speaker gallery."
     )

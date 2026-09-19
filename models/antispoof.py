@@ -280,15 +280,22 @@ def analyze_audio_bytes(
     band: float = DEFAULT_DECISION_BAND,
     threshold_source: str = "default (uncalibrated)",
     allow_download: bool = True,
+    transcribe: bool = False,
 ) -> dict:
     result = decode_audio_bytes(raw, filename)
     samples = result.pop("samples", None)
     if result.get("limitations") and samples is None:
         result["anti_spoof"] = None
         result["voice_error"] = "; ".join(result["limitations"])
+        if transcribe:
+            from models.asr import transcribe_pcm
+            result["asr"] = transcribe_pcm(None, 16000, duration=result.get("duration"))
         return result
     if samples is None:
         result["voice_error"] = "Audio quality insufficient for reliable authenticity analysis."
+        if transcribe:
+            from models.asr import transcribe_pcm
+            result["asr"] = transcribe_pcm(None, int(result.get("sample_rate") or 16000), duration=result.get("duration"))
         return result
     try:
         anti = run_antispoof_scores(
@@ -305,4 +312,13 @@ def analyze_audio_bytes(
         )
         result["anti_spoof"] = None
         result["voice_error"] = result["limitations"][-1]
+    if transcribe:
+        from models.asr import transcribe_pcm
+        result["asr"] = transcribe_pcm(
+            samples,
+            int(result.get("sample_rate") or 16000),
+            duration=result.get("duration"),
+        )
+        if result["asr"].get("status") == "success":
+            result["analysis_mode"] += " + local ASR"
     return result

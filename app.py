@@ -26,6 +26,14 @@ NEUTRAL_FACTORS = {
     "Context Safety": 93,
 }
 
+NAV_ITEMS = (
+    "Console",
+    "Demo Scenarios",
+    "Evaluation",
+    "Reports",
+    "Settings",
+)
+
 
 def init_state():
     defaults = {
@@ -54,10 +62,16 @@ def init_state():
         "conversation_state": new_conversation_state(),
         "demo_view": None,
         "edge_case_view": None,
+        "transcript_source": "NONE",
+        "live_warning": None,
+        "asr_filled_transcript": "",
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+    # Previous builds used "Demo scenarios"
+    if st.session_state.ui_nav == "Demo scenarios":
+        st.session_state.ui_nav = "Demo Scenarios"
 
 
 init_state()
@@ -66,22 +80,24 @@ render(st, css())
 with st.sidebar:
     render(st, """
     <div class="tv-brand">TRUSTVOICE AI
-      <span>Security analysis console</span>
+      <span>Conversation security</span>
     </div>
     """)
-    for label in ("Console", "Demo scenarios", "Evaluation", "Reports", "Settings"):
-        if st.button(label, key=f"nav_{label}", use_container_width=True):
+    current = st.session_state.ui_nav
+    for label in NAV_ITEMS:
+        if st.button(
+            label,
+            key=f"nav_{label}",
+            use_container_width=True,
+            type="primary" if current == label else "secondary",
+        ):
             st.session_state.ui_nav = label
             st.rerun()
-    st.caption(
-        "A real voice is not a safe conversation. Authenticity, identity, intent, "
-        "behaviour and context are scored separately, then fused as decision support."
-    )
 
 nav = st.session_state.ui_nav
 if nav == "Console":
     render_console()
-elif nav == "Demo scenarios":
+elif nav == "Demo Scenarios":
     render_demo()
 elif nav == "Evaluation":
     render_evaluation()

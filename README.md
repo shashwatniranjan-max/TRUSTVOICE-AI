@@ -17,6 +17,10 @@ calibrated detector accuracy.
   (`models/aasist.onnx` is the small default). Output is an *authenticity
   score* plus LIKELY AUTHENTIC / LIKELY SPOOF / INCONCLUSIVE, with an
   uncertainty band. Poor audio is inconclusive, not an alarm.
+- **ASR:** local faster-whisper on CPU (default model `tiny`, override with
+  `TRUSTVOICE_ASR_MODEL`, e.g. `base`). First load is cached in process.
+  Transcripts are **not** guaranteed accurate. ASR does not decide whether
+  a voice is synthetic.
 - **Interaction analysis:** TF-IDF + logistic regression intent classifier,
   regex entities, behavioural cues, context anomalies, conversation state.
 - **Fusion:** prototype weights in `risk/config.py`. Hard gates require
@@ -30,7 +34,13 @@ calibrated detector accuracy.
 
 ## Not implemented / not claimed
 
-- No in-house Whisper or ASR training. Paste a transcript for text analysis.
+- ASR is bundled as **local faster-whisper**, not an in-house trained model
+  and not a cloud LLM. Default `tiny` is multilingual enough for mixed
+  English/Indian-language speech in a demo, but **language accuracy has not
+  been evaluated** here. Manual transcript entry remains available and
+  **overrides** ASR for scoring when you type text.
+- ASR failure or no-speech does **not** mean the conversation is benign —
+  interaction analysis simply does not run until a transcript exists.
 - No live speaker enrollment. Identity is `VERIFIED` / `UNVERIFIED` /
   `NOT_AVAILABLE` / `MISMATCH` for the demo — unavailable is not “malicious”.
 - No telecom, SS7, or cellular tap.
@@ -50,12 +60,17 @@ Place a larger W2V2-AASIST ONNX file in `models/` or set `TRUSTVOICE_MODEL_PATH`
 to run a different checkpoint. First-run download is attempted only if the
 file is missing.
 
+ASR weights download once into the Hugging Face cache. On small Render instances
+prefer `TRUSTVOICE_ASR_MODEL=tiny` (default). Use `base` only if RAM allows.
+Clips longer than `TRUSTVOICE_ASR_MAX_SEC` (default 180) are rejected for ASR
+without crashing. Evaluation-lab anti-spoof runs do **not** load Whisper.
+
 ## Live analysis vs demo scenarios
 
 | Mode | What it is |
 | --- | --- |
-| **LIVE / UPLOADED ANALYSIS** | Real audio pipeline (if a file is provided) plus the interaction engine on the transcript. |
-| **DEMO SCENARIO** | Scripted dialogue run through the *same* interaction engine. Voice labels in the script are illustrative, not live AASIST measurements. |
+| **LIVE / UPLOADED ANALYSIS** | Decode audio → AASIST (if possible) → local ASR → existing intent / behaviour / context / fusion on the transcript (typed text overrides ASR). |
+| **DEMO SCENARIO** | Scripted dialogue run through the *same* interaction engine. Voice labels in the script are illustrative, not live AASIST measurements. Demo scripts do not call ASR. |
 
 Do not mix the two when presenting scores.
 
@@ -75,15 +90,18 @@ states that the threshold is the prototype default.
 ## Tests
 
 ```bash
-python -m unittest tests.test_pipeline
+python -m unittest tests.test_pipeline tests.test_asr
 ```
+
+ASR unit tests **mock** the Whisper boundary. They do not download weights or
+claim measured transcription accuracy.
 
 ## Layout
 
 ```
 app.py                 Streamlit entry
 ui/                    SOC-style console, demo, evaluation, reports, settings
-models/                anti-spoof, intent, entities
+models/                anti-spoof, ASR, intent, entities
 risk/                  behaviour, context, fusion, pipeline
 demo/                  scripted scenarios
 utils/                 audio, state, evaluation, reporting

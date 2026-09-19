@@ -5,12 +5,30 @@ from html import escape
 import streamlit as st
 
 from demo.scenarios import BENIGN_EXAMPLES, IDENTITY_HELP, SCENARIO_A, SCENARIO_B, SCENARIO_C
-from models.antispoof import MODEL_REGISTRY, analyze_audio_bytes
+from models.antispoof import analyze_audio_bytes
+from models.asr import asr_model_name, get_whisper_model, resolve_live_transcript
 from models.intent import intent_display_name
 from risk.pipeline import analyse_interaction
-from ui.components import decision_block, entity_lines, meter, render, signal_rows, waveform
-from ui.theme import COLORS, status_color
+from ui.components import (
+    analysis_mode,
+    conversation_timeline,
+    decision_block,
+    handshake_block,
+    idle_decision,
+    render,
+    scenario_choice,
+    score_trail,
+    signal_rows,
+    utterances_from_transcript,
+    waveform,
+    why_this_risk,
+)
 from utils.state import new_conversation_state
+
+
+@st.cache_resource(show_spinner=False)
+def _cached_asr_model(name: str):
+    return get_whisper_model(name)
 
 
 def _apply_result(result: dict, source: str, audio=None):
@@ -37,17 +55,16 @@ def _apply_result(result: dict, source: str, audio=None):
 
 
 def render_topbar():
-    spec = MODEL_REGISTRY.get(st.session_state.model_choice, {})
     source = st.session_state.get("analysis_source") or "Idle"
+    mode = analysis_mode(source)
     render(st, f"""
     <div class="tv-top">
-      <div class="tv-brand">TRUSTVOICE AI
+      <div class="tv-top-title">TRUSTVOICE AI
         <span>Conversation Security Console</span>
       </div>
-      <div class="tv-status"><span class="tv-dot"></span>Analysis engine online</div>
-      <div class="tv-meta">
-        Model · {escape(str(spec.get('label', 'AASIST')))}<br>
-        Mode · {escape(str(source))}
+      <div class="tv-top-meta">
+        <div class="tv-status"><span class="tv-dot"></span>Analysis Engine Online</div>
+        <div>Mode: {escape(mode)}</div>
       </div>
     </div>
     """)
@@ -56,19 +73,29 @@ def render_topbar():
 def render_console():
     render_topbar()
     source = st.session_state.get("analysis_source") or "Idle"
-    if source.startswith("DEMO"):
-        st.info("DEMO SCENARIO — scripted transcript and illustrative voice labels. Not a live AASIST verdict.")
-    elif source.startswith("LIVE"):
-        st.info("LIVE / MANUAL ANALYSIS — anti-spoofing runs on uploaded/microphone audio when provided. Transcript is typed (ASR is not bundled).")
+    mode = analysis_mode(source)
+    if mode == "DEMO":
+        render(st, '<div class="tv-banner">Demo scenario — scripted transcript and illustrative voice labels. Not a live AASIST verdict.</div>')
+    elif mode == "LIVE":
+        render(st, '<div class="tv-banner">Live analysis — anti-spoofing and local ASR run on uploaded or microphone audio when provided. Typed transcripts still override ASR.</div>')
+
     result = st.session_state.get("last_result")
     audio = st.session_state.get("last_analysis") or {}
     anti = (audio or {}).get("anti_spoof") or {}
     quality = (audio or {}).get("quality_gate") or {}
 
-    render(st, '<div class="tv-section">Call / audio analysis</div>')
-    left, mid, right = st.columns([1.1, 1.2, 1.1], gap="small")
+    hero, intake = st.columns([1.35, 1], gap="large")
+    with hero:
+        render(st, '<div class="tv-section" style="margin-top:0">Current decision</div>')
+        if result:
+            render(st, decision_block(result))
+            qlabel = (quality or {}).get("quality") or "—"
+            render(st, f'<div class="tv-note">Audio quality · {escape(str(qlabel))}</div>')
+        else:
+            render(st, idle_decision())
 
-    with left:
+    with intake:
+        render(st, '<div class="tv-section" style="margin-top:0">Analyze conversation</div>')
         uploaded = st.file_uploader(
             "Audio or video",
             type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm", "mov"],
@@ -76,20 +103,32 @@ def render_console():
         )
         mic = st.audio_input("Microphone capture", key="console_mic")
         transcript = st.text_area(
-            "Transcript (ASR is not bundled; paste text or type)",
-            value=st.session_state.get("transcript_input", ""),
+            "Transcript",
             height=90,
             key="console_transcript",
         )
+        asr_meta = (audio or {}).get("asr") or {}
+        tsrc = st.session_state.get("transcript_source") or "NONE"
+        if tsrc == "ASR":
+            st.caption("Source: ASR — ASR-generated transcript. Edit if needed. Not a guarantee of accuracy.")
+        elif tsrc == "MANUAL":
+            st.caption("Source: MANUAL — typed transcript used for interaction analysis.")
+            if asr_meta.get("status") == "success" and asr_meta.get("transcript"):
+                st.caption(f"ASR (not used for scoring): {asr_meta.get('transcript')}")
+        else:
+            st.caption("Type a transcript, or upload audio and run analysis to fill this from local ASR.")
         identity = st.selectbox(
             "Speaker identity (prototype — not an enrolled user directory)",
             ["NOT_AVAILABLE", "UNVERIFIED", "VERIFIED", "MISMATCH"],
             help=IDENTITY_HELP["NOT_AVAILABLE"],
         )
         st.caption(IDENTITY_HELP.get(identity, ""))
+        if st.session_state.get("live_warning"):
+            st.warning(st.session_state.live_warning)
         run = st.button("Run live analysis", use_container_width=True)
 
         if run:
+            st.session_state.live_warning = None
             raw = None
             fname = "typed_transcript.txt"
             if uploaded is not None:
@@ -100,8 +139,13 @@ def render_console():
             audio_result = None
             voice_label = "UNAVAILABLE"
             auth_score = None
+            asr_result = None
             if raw:
-                with st.spinner("Decoding audio and running countermeasure…"):
+                with st.spinner("Decoding audio, running anti-spoof, then local ASR…"):
+                    try:
+                        _cached_asr_model(asr_model_name())
+                    except Exception:
+                        pass
                     audio_result = analyze_audio_bytes(
                         raw, fname,
                         model_key=st.session_state.model_choice,
@@ -109,8 +153,10 @@ def render_console():
                         band=float(st.session_state.decision_band),
                         threshold_source=st.session_state.threshold_source,
                         allow_download=True,
+                        transcribe=True,
                     )
                 st.session_state.last_analysis = audio_result
+                asr_result = audio_result.get("asr")
                 if audio_result.get("limitations"):
                     st.warning(" | ".join(audio_result["limitations"]))
                 anti_now = audio_result.get("anti_spoof")
@@ -133,135 +179,110 @@ def render_console():
             else:
                 st.session_state.last_analysis = None
 
-            text = transcript.strip()
-            if not text and not raw:
-                pass
-            else:
-                if not text:
-                    st.info("Transcript unavailable. Audio authenticity analysis can still run.")
-                analysed = analyse_interaction(
-                    transcript=text,
-                    voice_label=voice_label,
-                    identity_status=identity,
-                    authenticity_score=auth_score,
-                    conversation_state=st.session_state.conversation_state,
-                    source="LIVE / MANUAL ANALYSIS",
-                    voice_evidence="model" if auth_score is not None else "unavailable",
-                )
-                _apply_result(analysed, "LIVE / UPLOADED ANALYSIS", audio_result)
+            if raw or transcript.strip():
+                filled = (st.session_state.get("asr_filled_transcript") or "").strip()
+                typed = transcript.strip()
+                if raw:
+                    manual = typed if typed and typed != filled else ""
+                else:
+                    manual = typed
+                choice = resolve_live_transcript(manual, asr_result)
+                st.session_state.transcript_source = choice["source"]
+                st.session_state.live_warning = choice["warning"]
+                if choice["source"] == "ASR" and choice["text"]:
+                    st.session_state.console_transcript = choice["text"]
+                    st.session_state.asr_filled_transcript = choice["text"]
+                if choice["analyze"]:
+                    analysed = analyse_interaction(
+                        transcript=choice["text"],
+                        voice_label=voice_label,
+                        identity_status=identity,
+                        authenticity_score=auth_score,
+                        conversation_state=st.session_state.conversation_state,
+                        source="LIVE / MANUAL ANALYSIS",
+                        voice_evidence="model" if auth_score is not None else "unavailable",
+                    )
+                    _apply_result(analysed, "LIVE / UPLOADED ANALYSIS", audio_result)
+                elif raw:
+                    st.session_state.analysis_source = "LIVE / UPLOADED ANALYSIS"
                 st.rerun()
 
-    with mid:
-        env = audio.get("envelope") if audio else None
-        render(st, f"""
-        <div class="tv-panel">
-          <div class="tv-kicker">Waveform</div>
-          {waveform(env)}
-          <div class="tv-muted">
-            Duration {escape(str(audio.get('duration', '—')))} s ·
-            Quality {escape(str(quality.get('quality', '—')))}
-          </div>
-        </div>
-        """)
-        if anti:
-            render(st, f"""
-            <div class="tv-panel" style="margin-top:10px">
-              <div class="tv-kicker">Voice authenticity</div>
-              <div class="tv-value small">{int(anti.get('authenticity_score', 0))} / 100</div>
-              {meter(int(anti.get('authenticity_score', 0)), status_color(anti.get('verdict')))}
-              <div class="tv-label">{escape(str(anti.get('verdict', 'UNAVAILABLE')))}</div>
-              <div class="tv-muted">Model confidence is an estimate from the selected countermeasure and is not a guarantee of authenticity.</div>
-            </div>
-            """)
-        else:
-            render(st, '<div class="tv-panel" style="margin-top:10px"><div class="tv-muted">No live countermeasure result. Upload audio or use a demo scenario.</div></div>')
-
-    with right:
-        if result:
-            render(st, decision_block(result))
-            qlabel = (quality or {}).get("quality") or "—"
-            render(st, f'<div class="tv-muted" style="margin-top:8px">Audio quality · {escape(str(qlabel))}</div>')
-        else:
-            render(st, '<div class="tv-panel"><div class="tv-kicker">Current decision</div><div class="tv-muted">Awaiting analysis. Live uploads use the real pipeline; demo scenarios are labelled separately.</div></div>')
-
     render(st, '<div class="tv-section">Risk signals</div>')
-    factors = (result or {}).get("factor_display") or st.session_state.factors
-    id_status = (result or {}).get("identity_status") or "NOT_AVAILABLE"
-    # Speaker identity row should show status text, not a fake enrollment score alone
-    display_factors = dict(factors)
-    render(st, signal_rows(display_factors))
-    st.caption(
-        f"Speaker identity status: {id_status.replace('_', ' ')}. "
-        + IDENTITY_HELP.get(id_status, "")
-    )
+    if result:
+        render(st, signal_rows(result.get("factor_display"), result.get("identity_status")))
+        id_status = result.get("identity_status") or "NOT_AVAILABLE"
+        st.caption(
+            f"Speaker identity status: {str(id_status).replace('_', ' ')}. "
+            + IDENTITY_HELP.get(id_status, "")
+        )
+    else:
+        render(st, signal_rows(None))
 
-    render(st, '<div class="tv-section">Conversation analysis</div>')
-    c1, c2 = st.columns(2, gap="small")
-    transcript_show = (result or {}).get("transcript") or st.session_state.transcript
     intent = (result or {}).get("intent") or {}
     behaviour = (result or {}).get("behaviour") or {}
     context = (result or {}).get("context") or {}
-    entities = (result or {}).get("entities") or []
-    with c1:
-        render(st, f"""
-        <div class="tv-panel">
-          <div class="tv-kicker">Transcript</div>
-          <div style="font-size:13px;line-height:1.6;margin-top:8px">{escape(str(transcript_show or '—'))}</div>
-        </div>
-        """)
-    with c2:
-        render(st, f"""
-        <div class="tv-panel">
-          <div class="tv-row"><span>Intent</span><span>{escape(intent_display_name(intent.get('intent','—')))}</span></div>
-          <div class="tv-row"><span>Entities</span><span>{entity_lines(entities)}</span></div>
-          <div class="tv-row"><span>Behaviour</span><span>{escape(str(behaviour.get('behaviour_level', 'LOW')))} · {escape(str(behaviour.get('disclaimer', '')))}</span></div>
-          <div class="tv-row"><span>Observed signals</span><span>{escape(', '.join(behaviour.get('signals') or []) or 'None')}</span></div>
-          <div class="tv-row"><span>Context</span><span>{escape(str(context.get('context_level', 'NORMAL')))}</span></div>
-        </div>
-        """)
-
-    render(st, '<div class="tv-section">Decision explanation</div>')
-    drivers = (result or {}).get("drivers") or ["No analysis yet"]
-    items = "".join(f"<div class='tv-row'><span>•</span><span>{escape(str(d))}</span></div>" for d in drivers)
-    render(st, f'<div class="tv-panel">{items}<div class="tv-muted" style="margin-top:8px">{escape(str((result or {}).get("action_detail") or ""))}</div></div>')
+    transcript_show = (result or {}).get("transcript") or st.session_state.transcript
+    talk, why = st.columns([1.35, 1], gap="large")
+    with talk:
+        render(st, '<div class="tv-section">Conversation</div>')
+        render(st, conversation_timeline(utterances_from_transcript(transcript_show)))
+        if result:
+            beh_bits = list(behaviour.get("signals") or [])
+            beh_text = ", ".join(beh_bits) if beh_bits else str(behaviour.get("behaviour_level", "LOW"))
+            render(st, f"""
+            <div class="tv-note">
+              Detected intent: {escape(intent_display_name(intent.get('intent', '—')))}<br>
+              Behaviour: {escape(beh_text)}<br>
+              Context: {escape(str(context.get('context_level', 'NORMAL')))}
+            </div>
+            """)
+    with why:
+        render(st, '<div class="tv-section">Why this risk?</div>')
+        render(st, why_this_risk((result or {}).get("drivers")))
+        if result and result.get("action_detail"):
+            render(st, f'<div class="tv-note">{escape(str(result.get("action_detail")))}</div>')
 
     if result and result.get("handshake_required"):
-        render(st, '<div class="tv-section">Trust handshake</div>')
-        render(st, f"""
-        <div class="tv-alert">
-          <div class="tv-kicker">Simulated Trust Handshake</div>
-          <div class="tv-label">Voice identity alone is not sufficient authorization for this action.</div>
-          <div class="tv-muted" style="margin-top:6px">{escape(result.get('action_detail', ''))}</div>
-          <div class="tv-muted">Verification request sent to registered device — simulated. This prototype does not contact a phone, bank, telecom provider, or device service. YES continues, NO stops, no response keeps the action blocked.</div>
-        </div>
-        """)
+        render(st, handshake_block(result.get("action_detail", "")))
         h1, h2, h3 = st.columns(3)
         with h1:
-            if st.button("Confirm request (simulated YES)", use_container_width=True):
+            if st.button("Confirm", use_container_width=True):
                 st.session_state.handshake_result = {
                     "status": "CONFIRMED",
                     "message": "Simulated confirmation on a trusted channel. Sensitive action may continue.",
                 }
         with h2:
-            if st.button("Deny request (simulated NO)", use_container_width=True):
+            if st.button("Deny", use_container_width=True):
                 st.session_state.handshake_result = {
                     "status": "DENIED",
                     "message": "Simulated denial. Sensitive action remains blocked.",
                 }
         with h3:
-            if st.button("No response (remain blocked)", use_container_width=True):
+            if st.button("No response", use_container_width=True):
                 st.session_state.handshake_result = {
                     "status": "NO_RESPONSE",
                     "message": "No independent confirmation. Sensitive action remains blocked pending manual verification.",
                 }
         if st.session_state.handshake_result:
-            st.info(
+            st.caption(
                 f"{st.session_state.handshake_result['status']}: "
                 f"{st.session_state.handshake_result['message']}"
             )
 
-    with st.expander("Advanced diagnostics"):
+    with st.expander("Audio evidence and diagnostics"):
+        if audio:
+            render(st, waveform(audio.get("envelope")))
+            render(st, f"""
+            <div class="tv-note">
+              Duration {escape(str(audio.get('duration', '—')))} s ·
+              Quality {escape(str(quality.get('quality', '—')))}
+            </div>
+            """)
         if anti:
+            render(st, f"""
+            <div class="tv-row"><span>Voice authenticity</span><span>{int(anti.get('authenticity_score', 0))} / 100 · {escape(str(anti.get('verdict', 'UNAVAILABLE')))}</span></div>
+            """)
+            st.caption("Model confidence is an estimate from the selected countermeasure and is not a guarantee of authenticity.")
             st.write({
                 "model": anti.get("model"),
                 "sample_rate": anti.get("sample_rate_used"),
@@ -278,7 +299,18 @@ def render_console():
             })
             st.caption(anti.get("score_note", ""))
         else:
-            st.write("No countermeasure diagnostics. Live audio has not been scored, or the model is unavailable.")
+            st.caption("No live countermeasure result. Upload audio or use a demo scenario.")
+        asr_info = (audio or {}).get("asr") or {}
+        if asr_info:
+            st.write({
+                "asr_model": asr_info.get("model"),
+                "transcription_status": asr_info.get("status"),
+                "duration": asr_info.get("duration"),
+                "detected_language": asr_info.get("language"),
+                "processing_time_sec": asr_info.get("elapsed_sec"),
+                "transcript_source": st.session_state.get("transcript_source") or "NONE",
+            })
+            st.caption("ASR is local faster-whisper on CPU. It is not a guarantee of transcription accuracy and does not decide whether a voice is synthetic.")
         st.caption(
             "Prototype processing is local to the application environment. "
             "Voice/audio data should be treated as sensitive and retained only as long as necessary. "
@@ -288,19 +320,26 @@ def render_console():
 
 def render_demo():
     render_topbar()
+    render(st, '<div class="tv-section" style="margin-top:0">Demo scenarios</div>')
     st.caption(
-        "Each button below is a different scripted call. Voice labels are illustrative — "
-        "not live AASIST output. Reset clears this page and the shared analysis session."
+        "Scripted calls with illustrative voice labels — not live AASIST output. "
+        "Reset clears this page and the shared analysis session."
     )
-    a, b, c, d = st.columns(4)
+
+    a, b, c, d = st.columns([1, 1, 1, 0.7], gap="medium")
+    selected = (st.session_state.get("demo_view") or {}).get("id")
     with a:
-        run_a = st.button("Run Scenario A", key="demo_run_a", use_container_width=True)
+        render(st, scenario_choice("A", "Unknown Caller", "Bank / OTP attack", selected == "A"))
+        run_a = st.button("Run A", key="demo_run_a", use_container_width=True)
     with b:
-        run_b = st.button("Run Scenario B", key="demo_run_b", use_container_width=True)
+        render(st, scenario_choice("B", "Verified Identity", "Dangerous request", selected == "B"))
+        run_b = st.button("Run B", key="demo_run_b", use_container_width=True)
     with c:
-        run_c = st.button("Run Scenario C", key="demo_run_c", use_container_width=True)
+        render(st, scenario_choice("C", "Benign", "Normal workplace conversation", selected == "C"))
+        run_c = st.button("Run C", key="demo_run_c", use_container_width=True)
     with d:
-        reset = st.button("Reset session", key="demo_reset", use_container_width=True)
+        render(st, '<div class="tv-choice"><div class="sub">Clear this demonstration</div></div>')
+        reset = st.button("Reset", key="demo_reset", use_container_width=True)
 
     if reset:
         _reset_demo_session()
@@ -313,15 +352,6 @@ def render_demo():
     elif run_c:
         _run_scenario(SCENARIO_C)
 
-    selected = (st.session_state.get("demo_view") or {}).get("id")
-    p1, p2, p3 = st.columns(3)
-    with p1:
-        _scenario_script_card(SCENARIO_A, selected == "A")
-    with p2:
-        _scenario_script_card(SCENARIO_B, selected == "B")
-    with p3:
-        _scenario_script_card(SCENARIO_C, selected == "C")
-
     demo = st.session_state.get("demo_view")
     edge = st.session_state.get("edge_case_view")
     if demo:
@@ -329,17 +359,12 @@ def render_demo():
     elif edge:
         _render_edge_case_result(edge)
     else:
-        render(st, """
-        <div class="tv-panel">
-          <div class="tv-kicker">No demo running</div>
-          <div class="tv-muted">Click Run Scenario A, B, or C. The conversation for that script only will appear here. Console uploads are not shown on this page.</div>
-        </div>
-        """)
+        render(st, '<div class="tv-note">Select a scenario. Only that scripted conversation will appear here. Console uploads are not shown on this page.</div>')
 
     edge_open = bool(st.session_state.get("edge_case_view"))
     with st.expander("Additional edge-case tests (not part of A / B / C)", expanded=edge_open):
         st.caption(
-            "Each click scores that one sentence and shows the result in the panel above. "
+            "Each click scores that one sentence and shows the result above. "
             "These are not the scripts for Scenarios A–C."
         )
         for i, (kind, text) in enumerate(BENIGN_EXAMPLES):
@@ -362,23 +387,6 @@ def render_demo():
                 st.rerun()
 
 
-def _scenario_script_card(spec: dict, active: bool):
-    lines = "".join(
-        f'<div class="tv-muted">{i}. {escape(step["text"])}</div>'
-        for i, step in enumerate(spec["steps"], start=1)
-    )
-    border = "border-color:#3d8bfd" if active else ""
-    kicker = "SELECTED" if active else f"SCENARIO {spec['id']}"
-    render(st, f"""
-    <div class="tv-panel" style="{border}">
-      <div class="tv-kicker">{kicker}</div>
-      <div class="tv-label">{escape(spec["title"])}</div>
-      <div class="tv-muted" style="margin:6px 0 8px">{escape(spec["note"])}</div>
-      {lines}
-    </div>
-    """)
-
-
 def _reset_demo_session():
     st.session_state.conversation_state = new_conversation_state()
     st.session_state.last_result = None
@@ -394,48 +402,74 @@ def _reset_demo_session():
     st.session_state.risk_explanation = []
     st.session_state.score = None
     st.session_state.scenario = "Awaiting analysis"
+    st.session_state.transcript_source = "NONE"
+    st.session_state.live_warning = None
+    st.session_state.asr_filled_transcript = ""
 
 
 def _render_edge_case_result(edge: dict):
     result = edge.get("result") or {}
-    render(st, f"""
-    <div class="tv-section">Edge-case test result</div>
-    <div class="tv-panel">
-      <div class="tv-kicker">{escape(str(edge.get("kind", "TEST")))}</div>
-      <div class="tv-label">{escape(str(edge.get("text", "")))}</div>
-      <div class="tv-muted" style="margin-top:8px">
-        This is a single-sentence check, not Scenario A/B/C.
-        Intent: {escape(str(((result.get("intent") or {}).get("intent") or "—")).replace("_", " "))}
-      </div>
-    </div>
-    """)
-    render(st, decision_block(result))
+    render(st, f'<div class="tv-section">{escape(str(edge.get("kind", "TEST")))}</div>')
+    render(st, conversation_timeline([str(edge.get("text") or "")]))
+    render(st, '<div class="tv-note">Single-sentence check, not Scenario A/B/C.</div>')
+    if result:
+        render(st, decision_block(result))
 
 
 def _render_demo_progression(demo: dict):
-    title = escape(str(demo.get("title", "Demo scenario")))
-    note = escape(str(demo.get("note", "")))
-    rows = []
-    for i, turn in enumerate(demo.get("turns") or [], start=1):
-        rows.append(
-            f'<div class="tv-row"><span>Turn {i}</span>'
-            f'<span>{escape(str(turn["text"]))}</span></div>'
-            f'<div class="tv-muted" style="padding:0 0 8px 0">'
-            f'Trust {int(turn["trust_score"])} / 100 · {escape(str(turn["risk"]))} · '
-            f'{escape(str(turn["action"]))}</div>'
-        )
+    title = str(demo.get("title", "Demo scenario"))
+    turns = demo.get("turns") or []
     render(st, f"""
-    <div class="tv-section">Running now · Scenario {escape(str(demo.get("id", "")))}</div>
-    <div class="tv-panel">
-      <div class="tv-kicker">DEMO SCENARIO · {escape(str(demo.get("id", "")))} only</div>
-      <div class="tv-label">{title}</div>
-      <div class="tv-muted" style="margin:6px 0 12px">{note}</div>
-      {"".join(rows)}
-    </div>
+    <div class="tv-section">Scenario {escape(str(demo.get("id", "")))}</div>
+    <div class="tv-label">{escape(title)}</div>
     """)
-    if st.session_state.get("last_result"):
-        render(st, '<div class="tv-section">Final decision for this scenario</div>')
-        render(st, decision_block(st.session_state.last_result))
+    render(st, '<div class="tv-section">Conversation</div>')
+    render(st, conversation_timeline([str(t.get("text") or "") for t in turns]))
+    render(st, score_trail([int(t.get("trust_score") or 0) for t in turns]))
+    last = st.session_state.get("last_result")
+    if last:
+        render(st, '<div class="tv-section">Final decision</div>')
+        render(st, decision_block(last))
+        intent = last.get("intent") or {}
+        behaviour = last.get("behaviour") or {}
+        context = last.get("context") or {}
+        beh_bits = list(behaviour.get("signals") or [])
+        beh_text = ", ".join(beh_bits) if beh_bits else str(behaviour.get("behaviour_level", "LOW"))
+        render(st, f"""
+        <div class="tv-note">
+          Detected intent: {escape(intent_display_name(intent.get('intent', '—')))}<br>
+          Behaviour: {escape(beh_text)}<br>
+          Context: {escape(str(context.get('context_level', 'NORMAL')))}
+        </div>
+        """)
+        render(st, '<div class="tv-section">Why this risk?</div>')
+        render(st, why_this_risk(last.get("drivers")))
+        if last.get("handshake_required"):
+            render(st, handshake_block(last.get("action_detail", "")))
+            d1, d2, d3 = st.columns(3)
+            with d1:
+                if st.button("Confirm", key="demo_hs_yes", use_container_width=True):
+                    st.session_state.handshake_result = {
+                        "status": "CONFIRMED",
+                        "message": "Simulated confirmation on a trusted channel. Sensitive action may continue.",
+                    }
+            with d2:
+                if st.button("Deny", key="demo_hs_no", use_container_width=True):
+                    st.session_state.handshake_result = {
+                        "status": "DENIED",
+                        "message": "Simulated denial. Sensitive action remains blocked.",
+                    }
+            with d3:
+                if st.button("No response", key="demo_hs_none", use_container_width=True):
+                    st.session_state.handshake_result = {
+                        "status": "NO_RESPONSE",
+                        "message": "No independent confirmation. Sensitive action remains blocked pending manual verification.",
+                    }
+            if st.session_state.handshake_result:
+                st.caption(
+                    f"{st.session_state.handshake_result['status']}: "
+                    f"{st.session_state.handshake_result['message']}"
+                )
 
 
 def _run_scenario(spec):
