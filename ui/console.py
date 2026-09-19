@@ -307,18 +307,27 @@ def render_demo():
         st.session_state.analysis_source = "Idle"
         st.session_state.handshake_result = None
         st.session_state.history = []
+        st.session_state.demo_view = None
         st.rerun()
 
-    slot = st.empty()
     if run_a:
-        _run_scenario(SCENARIO_A, slot)
+        _run_scenario(SCENARIO_A)
     if run_b:
-        _run_scenario(SCENARIO_B, slot)
+        _run_scenario(SCENARIO_B)
     if run_c:
-        _run_scenario(SCENARIO_C, slot)
+        _run_scenario(SCENARIO_C)
 
-    render(st, '<div class="tv-section">Benign / contrast examples</div>')
-    st.caption("These buttons run the live interaction pipeline on fixed sentences so judges can see false-positive behaviour.")
+    demo = st.session_state.get("demo_view")
+    if demo:
+        _render_demo_progression(demo)
+    else:
+        st.caption("Select Scenario A, B, or C to show that script’s conversation and trust-score progression.")
+
+    render(st, '<div class="tv-section">Additional edge-case tests</div>')
+    st.caption(
+        "Separate from Scenarios A–C. Each button scores one fixed sentence through the "
+        "interaction engine (not a scripted multi-turn demo)."
+    )
     for i, (kind, text) in enumerate(BENIGN_EXAMPLES):
         if st.button(f"{kind}: {text}", key=f"ex_{i}", use_container_width=True):
             analysed = analyse_interaction(
@@ -329,17 +338,45 @@ def render_demo():
                 voice_evidence="illustrative",
                 conversation_state=new_conversation_state(),
             )
+            st.session_state.demo_view = None
             _apply_result(analysed, "LIVE / MANUAL ANALYSIS")
             st.rerun()
 
-    if st.session_state.get("last_result"):
+    if st.session_state.get("last_result") and not demo:
         render(st, decision_block(st.session_state.last_result))
 
 
-def _run_scenario(spec, slot):
+def _render_demo_progression(demo: dict):
+    title = escape(str(demo.get("title", "Demo scenario")))
+    note = escape(str(demo.get("note", "")))
+    rows = []
+    for i, turn in enumerate(demo.get("turns") or [], start=1):
+        rows.append(
+            f'<div class="tv-row"><span>Turn {i}</span>'
+            f'<span>{escape(str(turn["text"]))}</span></div>'
+            f'<div class="tv-muted" style="padding:0 0 8px 0">'
+            f'Trust {int(turn["trust_score"])} / 100 · {escape(str(turn["risk"]))} · '
+            f'{escape(str(turn["action"]))}</div>'
+        )
+    render(st, f"""
+    <div class="tv-section">Selected demo conversation</div>
+    <div class="tv-panel">
+      <div class="tv-kicker">DEMO SCENARIO · {escape(str(demo.get("id", "")))}</div>
+      <div class="tv-label">{title}</div>
+      <div class="tv-muted" style="margin:6px 0 12px">{note}</div>
+      {"".join(rows)}
+    </div>
+    """)
+    if st.session_state.get("last_result"):
+        render(st, '<div class="tv-section">Final decision</div>')
+        render(st, decision_block(st.session_state.last_result))
+
+
+def _run_scenario(spec):
     state = new_conversation_state()
     combined = []
     last = None
+    turns = []
     for step in spec["steps"]:
         combined.append(step["text"])
         last = analyse_interaction(
@@ -352,14 +389,21 @@ def _run_scenario(spec, slot):
             voice_evidence="illustrative",
         )
         state = last["conversation_state"]
-        slot.markdown(
-            f"**{spec['title']}** — {step['text']} → trust {last['trust_score']} · "
-            f"{last['interaction_risk']} · {last['action']}"
-        )
+        turns.append({
+            "text": step["text"],
+            "trust_score": last["trust_score"],
+            "risk": last["interaction_risk"],
+            "action": last["action"],
+        })
     if last:
         last = dict(last)
         last["transcript"] = " ".join(s["text"] for s in spec["steps"])
+        st.session_state.demo_view = {
+            "id": spec.get("id"),
+            "title": spec.get("title"),
+            "note": spec.get("note"),
+            "turns": turns,
+        }
         _apply_result(last, "DEMO SCENARIO")
         st.session_state.last_analysis = None
-        st.info(spec["note"])
         st.rerun()
