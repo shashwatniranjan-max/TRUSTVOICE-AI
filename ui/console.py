@@ -288,62 +288,128 @@ def render_console():
 
 def render_demo():
     render_topbar()
-    st.caption("DEMO SCENARIO buttons use scripted dialogue and illustrative voice labels. They are not live anti-spoof measurements.")
+    st.caption(
+        "Each button below is a different scripted call. Voice labels are illustrative — "
+        "not live AASIST output. Reset clears this page and the shared analysis session."
+    )
     a, b, c, d = st.columns(4)
     with a:
-        run_a = st.button("Scenario A · unknown caller", use_container_width=True)
+        run_a = st.button("Run Scenario A", key="demo_run_a", use_container_width=True)
     with b:
-        run_b = st.button("Scenario B · verified + dangerous", use_container_width=True)
+        run_b = st.button("Run Scenario B", key="demo_run_b", use_container_width=True)
     with c:
-        run_c = st.button("Scenario C · benign", use_container_width=True)
+        run_c = st.button("Run Scenario C", key="demo_run_c", use_container_width=True)
     with d:
-        reset = st.button("Reset session", use_container_width=True)
+        reset = st.button("Reset session", key="demo_reset", use_container_width=True)
 
     if reset:
-        st.session_state.conversation_state = new_conversation_state()
-        st.session_state.last_result = None
-        st.session_state.last_analysis = None
-        st.session_state.transcript = ""
-        st.session_state.analysis_source = "Idle"
-        st.session_state.handshake_result = None
-        st.session_state.history = []
-        st.session_state.demo_view = None
+        _reset_demo_session()
         st.rerun()
 
     if run_a:
         _run_scenario(SCENARIO_A)
-    if run_b:
+    elif run_b:
         _run_scenario(SCENARIO_B)
-    if run_c:
+    elif run_c:
         _run_scenario(SCENARIO_C)
 
+    selected = (st.session_state.get("demo_view") or {}).get("id")
+    p1, p2, p3 = st.columns(3)
+    with p1:
+        _scenario_script_card(SCENARIO_A, selected == "A")
+    with p2:
+        _scenario_script_card(SCENARIO_B, selected == "B")
+    with p3:
+        _scenario_script_card(SCENARIO_C, selected == "C")
+
     demo = st.session_state.get("demo_view")
+    edge = st.session_state.get("edge_case_view")
     if demo:
         _render_demo_progression(demo)
+    elif edge:
+        _render_edge_case_result(edge)
     else:
-        st.caption("Select Scenario A, B, or C to show that script’s conversation and trust-score progression.")
+        render(st, """
+        <div class="tv-panel">
+          <div class="tv-kicker">No demo running</div>
+          <div class="tv-muted">Click Run Scenario A, B, or C. The conversation for that script only will appear here. Console uploads are not shown on this page.</div>
+        </div>
+        """)
 
-    render(st, '<div class="tv-section">Additional edge-case tests</div>')
-    st.caption(
-        "Separate from Scenarios A–C. Each button scores one fixed sentence through the "
-        "interaction engine (not a scripted multi-turn demo)."
+    edge_open = bool(st.session_state.get("edge_case_view"))
+    with st.expander("Additional edge-case tests (not part of A / B / C)", expanded=edge_open):
+        st.caption(
+            "Each click scores that one sentence and shows the result in the panel above. "
+            "These are not the scripts for Scenarios A–C."
+        )
+        for i, (kind, text) in enumerate(BENIGN_EXAMPLES):
+            if st.button(f"{kind}: {text}", key=f"ex_{i}", use_container_width=True):
+                analysed = analyse_interaction(
+                    transcript=text,
+                    voice_label="UNAVAILABLE" if kind == "SPOOF-NOTE" else "LIKELY_AUTHENTIC",
+                    identity_status="UNVERIFIED",
+                    source="LIVE / MANUAL ANALYSIS",
+                    voice_evidence="illustrative",
+                    conversation_state=new_conversation_state(),
+                )
+                st.session_state.demo_view = None
+                st.session_state.edge_case_view = {
+                    "kind": kind,
+                    "text": text,
+                    "result": analysed,
+                }
+                _apply_result(analysed, "LIVE / MANUAL ANALYSIS")
+                st.rerun()
+
+
+def _scenario_script_card(spec: dict, active: bool):
+    lines = "".join(
+        f'<div class="tv-muted">{i}. {escape(step["text"])}</div>'
+        for i, step in enumerate(spec["steps"], start=1)
     )
-    for i, (kind, text) in enumerate(BENIGN_EXAMPLES):
-        if st.button(f"{kind}: {text}", key=f"ex_{i}", use_container_width=True):
-            analysed = analyse_interaction(
-                transcript=text,
-                voice_label="UNAVAILABLE" if kind == "SPOOF-NOTE" else "LIKELY_AUTHENTIC",
-                identity_status="UNVERIFIED",
-                source="LIVE / MANUAL ANALYSIS",
-                voice_evidence="illustrative",
-                conversation_state=new_conversation_state(),
-            )
-            st.session_state.demo_view = None
-            _apply_result(analysed, "LIVE / MANUAL ANALYSIS")
-            st.rerun()
+    border = "border-color:#3d8bfd" if active else ""
+    kicker = "SELECTED" if active else f"SCENARIO {spec['id']}"
+    render(st, f"""
+    <div class="tv-panel" style="{border}">
+      <div class="tv-kicker">{kicker}</div>
+      <div class="tv-label">{escape(spec["title"])}</div>
+      <div class="tv-muted" style="margin:6px 0 8px">{escape(spec["note"])}</div>
+      {lines}
+    </div>
+    """)
 
-    if st.session_state.get("last_result") and not demo:
-        render(st, decision_block(st.session_state.last_result))
+
+def _reset_demo_session():
+    st.session_state.conversation_state = new_conversation_state()
+    st.session_state.last_result = None
+    st.session_state.last_analysis = None
+    st.session_state.transcript = ""
+    st.session_state.analysis_source = "Idle"
+    st.session_state.handshake_result = None
+    st.session_state.history = []
+    st.session_state.demo_view = None
+    st.session_state.edge_case_view = None
+    st.session_state.analysis_done = False
+    st.session_state.intent_prediction = None
+    st.session_state.risk_explanation = []
+    st.session_state.score = None
+    st.session_state.scenario = "Awaiting analysis"
+
+
+def _render_edge_case_result(edge: dict):
+    result = edge.get("result") or {}
+    render(st, f"""
+    <div class="tv-section">Edge-case test result</div>
+    <div class="tv-panel">
+      <div class="tv-kicker">{escape(str(edge.get("kind", "TEST")))}</div>
+      <div class="tv-label">{escape(str(edge.get("text", "")))}</div>
+      <div class="tv-muted" style="margin-top:8px">
+        This is a single-sentence check, not Scenario A/B/C.
+        Intent: {escape(str(((result.get("intent") or {}).get("intent") or "—")).replace("_", " "))}
+      </div>
+    </div>
+    """)
+    render(st, decision_block(result))
 
 
 def _render_demo_progression(demo: dict):
@@ -359,20 +425,21 @@ def _render_demo_progression(demo: dict):
             f'{escape(str(turn["action"]))}</div>'
         )
     render(st, f"""
-    <div class="tv-section">Selected demo conversation</div>
+    <div class="tv-section">Running now · Scenario {escape(str(demo.get("id", "")))}</div>
     <div class="tv-panel">
-      <div class="tv-kicker">DEMO SCENARIO · {escape(str(demo.get("id", "")))}</div>
+      <div class="tv-kicker">DEMO SCENARIO · {escape(str(demo.get("id", "")))} only</div>
       <div class="tv-label">{title}</div>
       <div class="tv-muted" style="margin:6px 0 12px">{note}</div>
       {"".join(rows)}
     </div>
     """)
     if st.session_state.get("last_result"):
-        render(st, '<div class="tv-section">Final decision</div>')
+        render(st, '<div class="tv-section">Final decision for this scenario</div>')
         render(st, decision_block(st.session_state.last_result))
 
 
 def _run_scenario(spec):
+    _reset_demo_session()
     state = new_conversation_state()
     combined = []
     last = None
@@ -406,4 +473,5 @@ def _run_scenario(spec):
         }
         _apply_result(last, "DEMO SCENARIO")
         st.session_state.last_analysis = None
+        st.session_state.edge_case_view = None
         st.rerun()

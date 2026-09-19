@@ -52,6 +52,8 @@ def init_state():
         "accuracy_eval": None,
         "analysis_source": "Idle",
         "conversation_state": new_conversation_state(),
+        "demo_view": None,
+        "edge_case_view": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
