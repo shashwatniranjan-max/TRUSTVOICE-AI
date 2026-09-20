@@ -9,8 +9,8 @@ from ui.console import render_topbar
 
 
 def render_settings():
-    render_topbar()
-    render(st, '<div class="tv-section" style="margin-top:0">Settings</div>')
+    render_topbar("Settings")
+    render(st, '<div class="tv-card-title">Analysis</div>')
     st.caption(
         "The default 0.50 threshold is a prototype starting point, not a calibrated probability. "
         "Use the evaluation lab when you have labelled REAL_ and SPOOF_ files."
@@ -52,18 +52,22 @@ def render_settings():
     if src.startswith("default"):
         st.info("Threshold not calibrated — using prototype default.")
 
+    render(st, '<div class="tv-card-title" style="margin-top:16px">Audio / ASR</div>')
     render(st, f"""
-    <table class="tv-table">
-      <tr><td>Model</td><td>{MODEL_REGISTRY[st.session_state.model_choice]['label']}</td></tr>
-      <tr><td>Threshold</td><td class="num">{st.session_state.bona_threshold:.3f}</td></tr>
-      <tr><td>Decision band</td><td class="num">±{st.session_state.decision_band:.3f}</td></tr>
-      <tr><td>Threshold source</td><td>{src}</td></tr>
-      <tr><td>ASR model</td><td>{asr_model_name()} (TRUSTVOICE_ASR_MODEL)</td></tr>
-      <tr><td>Model directory</td><td>{MODEL_DIR}</td></tr>
-      <tr><td>Execution</td><td>CPU · 1 thread · sequential</td></tr>
-    </table>
+    <div class="tv-card">
+      <table class="tv-table">
+        <tr><td>Model</td><td>{MODEL_REGISTRY[st.session_state.model_choice]['label']}</td></tr>
+        <tr><td>Threshold</td><td class="num">{st.session_state.bona_threshold:.3f}</td></tr>
+        <tr><td>Decision band</td><td class="num">±{st.session_state.decision_band:.3f}</td></tr>
+        <tr><td>Threshold source</td><td>{src}</td></tr>
+        <tr><td>ASR model</td><td>{asr_model_name()} (TRUSTVOICE_ASR_MODEL)</td></tr>
+        <tr><td>Model directory</td><td>{MODEL_DIR}</td></tr>
+        <tr><td>Execution</td><td>CPU · 1 thread · sequential</td></tr>
+      </table>
+    </div>
     """)
     st.caption(MODEL_REGISTRY[st.session_state.model_choice]["note"])
+    render(st, '<div class="tv-card-title" style="margin-top:16px">Prototype information</div>')
     st.caption(
         "Prototype processing is local to the application environment. Voice/audio data should "
         "be treated as sensitive and retained only as long as necessary. Set TRUSTVOICE_MODEL_PATH "

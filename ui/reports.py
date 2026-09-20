@@ -26,8 +26,13 @@ def _fmt_list(value) -> str:
 
 
 def render_reports():
-    render_topbar()
-    render(st, '<div class="tv-section" style="margin-top:0">Incident report</div>')
+    render_topbar("Reports")
+    render(st, """
+    <div class="tv-card">
+      <div class="tv-card-title">Incident report</div>
+      <div class="tv-muted">Generate a summary from the latest analysis in this session. Prototype limitations stay attached to the export.</div>
+    </div>
+    """)
     if st.button("Generate incident report", use_container_width=True):
         try:
             report = build_incident_report(st.session_state)
@@ -61,44 +66,62 @@ def render_reports():
 
     render(st, f"""
     <div class="tv-report">
-      <h2>Incident</h2>
-      <table class="tv-table">
-        <tr><td>Report ID</td><td>{escape(str(rep.get('report_id', '—')))}</td></tr>
-        <tr><td>Generated</td><td>{escape(str(rep.get('generated_at', '—')))}</td></tr>
-        <tr><td>Source</td><td>{escape(str(rep.get('source', '—')))}</td></tr>
-        <tr><td>Scenario</td><td>{escape(str(rep.get('scenario', '—')))}</td></tr>
-      </table>
+      <div class="tv-card">
+        <div class="tv-card-title">Summary</div>
+        <table class="tv-table">
+          <tr><td>Report ID</td><td>{escape(str(rep.get('report_id', '—')))}</td></tr>
+          <tr><td>Generated</td><td>{escape(str(rep.get('generated_at', '—')))}</td></tr>
+          <tr><td>Source</td><td>{escape(str(rep.get('source', '—')))}</td></tr>
+          <tr><td>Scenario</td><td>{escape(str(rep.get('scenario', '—')))}</td></tr>
+        </table>
+      </div>
 
-      <h2>Risk</h2>
-      <table class="tv-table">
-        <tr><td>Trust score</td><td class="num">{escape(str(rep.get('trust_score', '—')))} / 100</td></tr>
-        <tr><td>Interaction risk</td><td>{escape(str(rep.get('interaction_risk', '—')))}</td></tr>
-        <tr><td>Recommended action</td><td>{escape(str(rep.get('recommended_action', '—')))}</td></tr>
-        <tr><td>Handshake</td><td>{'required' if rep.get('handshake_required') else 'not required'}</td></tr>
-      </table>
+      <div class="tv-card" style="margin-top:12px">
+        <div class="tv-card-title">Risk decision</div>
+        <table class="tv-table">
+          <tr><td>Trust score</td><td class="num">{escape(str(rep.get('trust_score', '—')))} / 100</td></tr>
+          <tr><td>Interaction risk</td><td>{escape(str(rep.get('interaction_risk', '—')))}</td></tr>
+          <tr><td>Recommended action</td><td>{escape(str(rep.get('recommended_action', '—')))}</td></tr>
+          <tr><td>Handshake</td><td>{'required' if rep.get('handshake_required') else 'not required'}</td></tr>
+        </table>
+      </div>
 
-      <h2>Evidence</h2>
-      <p>{escape(str(rep.get('transcript') or 'No transcript recorded.'))}</p>
-      <table class="tv-table">
-        <tr><td>Voice authenticity</td><td>{escape(str(rep.get('voice_authenticity', '—')))}</td></tr>
-        <tr><td>Identity</td><td>{escape(str(rep.get('identity_status') or '—').replace('_', ' '))}</td></tr>
-        <tr><td>Audio quality</td><td>{escape(str(audio_q_text))}</td></tr>
-        <tr><td>Model</td><td>{escape(str(rep.get('model') or '—'))}</td></tr>
-      </table>
+      <div class="tv-card" style="margin-top:12px">
+        <div class="tv-card-title">Transcript</div>
+        <p>{escape(str(rep.get('transcript') or 'No transcript recorded.'))}</p>
+      </div>
 
-      <h2>Detected signals</h2>
-      <table class="tv-table">
-        <tr><td>Intent</td><td>{escape(_fmt_intent(rep))}</td></tr>
-        <tr><td>Behaviour</td><td>{escape(_fmt_list(rep.get('behaviour_signals')))}</td></tr>
-        <tr><td>Context</td><td>{escape(_fmt_list(rep.get('context_signals')))}</td></tr>
-        {factor_lines}
-      </table>
-      <div class="tv-why"><ul>{drivers}</ul></div>
+      <div class="tv-card" style="margin-top:12px">
+        <div class="tv-card-title">Signal breakdown</div>
+        <table class="tv-table">
+          <tr><td>Voice authenticity</td><td>{escape(str(rep.get('voice_authenticity', '—')))}</td></tr>
+          <tr><td>Identity</td><td>{escape(str(rep.get('identity_status') or '—').replace('_', ' '))}</td></tr>
+          <tr><td>Audio quality</td><td>{escape(str(audio_q_text))}</td></tr>
+          <tr><td>Model</td><td>{escape(str(rep.get('model') or '—'))}</td></tr>
+        </table>
+      </div>
 
-      <h2>Recommended action</h2>
-      <p>{escape(str(rep.get('recommended_action') or '—'))}</p>
-      <p class="tv-muted">{escape(str(rep.get('action_detail') or ''))}</p>
-      <p class="tv-note">{escape(str(rep.get('prototype_note', '')))}</p>
+      <div class="tv-card" style="margin-top:12px">
+        <div class="tv-card-title">Key indicators</div>
+        <table class="tv-table">
+          <tr><td>Intent</td><td>{escape(_fmt_intent(rep))}</td></tr>
+          <tr><td>Behaviour</td><td>{escape(_fmt_list(rep.get('behaviour_signals')))}</td></tr>
+          <tr><td>Context</td><td>{escape(_fmt_list(rep.get('context_signals')))}</td></tr>
+          {factor_lines}
+        </table>
+        <div class="tv-why"><ul>{drivers}</ul></div>
+      </div>
+
+      <div class="tv-card" style="margin-top:12px">
+        <div class="tv-card-title">Recommended action</div>
+        <p>{escape(str(rep.get('recommended_action') or '—'))}</p>
+        <p class="tv-muted">{escape(str(rep.get('action_detail') or ''))}</p>
+      </div>
+
+      <div class="tv-card" style="margin-top:12px">
+        <div class="tv-card-title">Prototype limitations</div>
+        <p class="tv-note">{escape(str(rep.get('prototype_note', '')))}</p>
+      </div>
     </div>
     """)
 

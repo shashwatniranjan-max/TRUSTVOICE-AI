@@ -11,73 +11,86 @@ from utils.evaluation import evaluate_labeled_voice_set
 
 
 def render_evaluation():
-    render_topbar()
-    render(st, '<div class="tv-section" style="margin-top:0">Evaluation laboratory</div>')
-    st.caption(
-        "Filename prefixes REAL_ / SPOOF_ (also BONAFIDE_ / FAKE_) label samples. "
-        "No metrics are shown until labelled files are actually evaluated. "
-        "These figures describe only the files you uploaded, not a published accuracy claim."
-    )
-
-    eval_files = st.file_uploader(
-        "Labelled evaluation set",
-        type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm", "mov", "mkv", "avi"],
-        accept_multiple_files=True,
-        key="evaluation_dataset",
-    )
-    if st.button("Run labelled evaluation", use_container_width=True):
-        if not eval_files:
-            st.warning("Upload labelled REAL_ and SPOOF_ files first.")
-        else:
-            with st.spinner("Evaluating labelled audio…"):
-                try:
-                    st.session_state.accuracy_eval = evaluate_labeled_voice_set(
-                        eval_files,
-                        threshold=float(st.session_state.bona_threshold),
-                        model_key=st.session_state.model_choice,
-                    )
-                except Exception as exc:
-                    st.session_state.accuracy_eval = {"error": f"{type(exc).__name__}: {exc}"}
+    render_topbar("Evaluation Lab")
+    c1, c2 = st.columns([1, 1.2], gap="medium")
+    with c1:
+        render(st, """
+        <div class="tv-card">
+          <div class="tv-card-title">Label requirements</div>
+          <div class="tv-muted">Filename prefixes REAL_ / SPOOF_ (also BONAFIDE_ / FAKE_) label samples.</div>
+          <div class="tv-note">No metrics are shown until labelled files are actually evaluated. Figures describe only the files you uploaded, not a published accuracy claim.</div>
+        </div>
+        """)
+        eval_files = st.file_uploader(
+            "Dataset upload",
+            type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm", "mov", "mkv", "avi"],
+            accept_multiple_files=True,
+            key="evaluation_dataset",
+        )
+        if st.button("Run labelled evaluation", use_container_width=True):
+            if not eval_files:
+                st.warning("Upload labelled REAL_ and SPOOF_ files first.")
+            else:
+                with st.spinner("Evaluating labelled audio…"):
+                    try:
+                        st.session_state.accuracy_eval = evaluate_labeled_voice_set(
+                            eval_files,
+                            threshold=float(st.session_state.bona_threshold),
+                            model_key=st.session_state.model_choice,
+                        )
+                    except Exception as exc:
+                        st.session_state.accuracy_eval = {"error": f"{type(exc).__name__}: {exc}"}
 
     ev = st.session_state.get("accuracy_eval")
-    if not ev:
-        st.caption("No evaluation has been run in this session.")
-        return
-    if ev.get("error"):
-        st.error(ev["error"])
-        return
-    if not ev.get("n"):
-        st.warning("No valid labelled samples found. Use REAL_… and SPOOF_… filenames.")
-        return
+    with c2:
+        if not ev:
+            render(st, """
+            <div class="tv-card">
+              <div class="tv-card-title">Results</div>
+              <div class="tv-muted">No evaluation has been run in this session.</div>
+              <div class="tv-note">Upload labelled files and run evaluation to see metrics.</div>
+            </div>
+            """)
+            return
+        if ev.get("error"):
+            st.error(ev["error"])
+            return
+        if not ev.get("n"):
+            st.warning("No valid labelled samples found. Use REAL_… and SPOOF_… filenames.")
+            return
 
-    far, frr, eer = ev.get("far"), ev.get("frr"), ev.get("eer")
-    render(st, '<div class="tv-section">Metrics on this labelled set</div>')
-    render(st, f"""
-    <table class="tv-table">
-      <tr><th>Metric</th><th class="num">Value</th></tr>
-      <tr><td>Accuracy</td><td class="num">{ev['accuracy']*100:.1f}%</td></tr>
-      <tr><td>Precision</td><td class="num">{ev['precision']*100:.1f}%</td></tr>
-      <tr><td>Recall</td><td class="num">{ev['recall']*100:.1f}%</td></tr>
-      <tr><td>F1</td><td class="num">{ev['f1']*100:.1f}%</td></tr>
-      <tr><td>FAR (spoof accepted as authentic)</td><td class="num">{'n/a' if far is None else f'{far*100:.1f}%'}</td></tr>
-      <tr><td>FRR (authentic rejected as spoof)</td><td class="num">{'n/a' if frr is None else f'{frr*100:.1f}%'}</td></tr>
-      <tr><td>EER</td><td class="num">{'n/a' if eer is None else f'{eer*100:.2f}%'}</td></tr>
-    </table>
-    """)
+        far, frr, eer = ev.get("far"), ev.get("frr"), ev.get("eer")
+        render(st, f"""
+        <div class="tv-card">
+          <div class="tv-card-title">Metrics on this labelled set</div>
+          <table class="tv-table">
+            <tr><th>Metric</th><th class="num">Value</th></tr>
+            <tr><td>Accuracy</td><td class="num">{ev['accuracy']*100:.1f}%</td></tr>
+            <tr><td>Precision</td><td class="num">{ev['precision']*100:.1f}%</td></tr>
+            <tr><td>Recall</td><td class="num">{ev['recall']*100:.1f}%</td></tr>
+            <tr><td>F1</td><td class="num">{ev['f1']*100:.1f}%</td></tr>
+            <tr><td>FAR (spoof accepted as authentic)</td><td class="num">{'n/a' if far is None else f'{far*100:.1f}%'}</td></tr>
+            <tr><td>FRR (authentic rejected as spoof)</td><td class="num">{'n/a' if frr is None else f'{frr*100:.1f}%'}</td></tr>
+            <tr><td>EER</td><td class="num">{'n/a' if eer is None else f'{eer*100:.2f}%'}</td></tr>
+          </table>
+        </div>
+        """)
 
-    cm = ev.get("confusion") or {}
-    render(st, '<div class="tv-section">Confusion matrix</div>')
-    render(st, f"""
-    <table class="tv-table">
-      <tr><th></th><th class="num">Pred authentic</th><th class="num">Pred spoof</th></tr>
-      <tr><td>Truth authentic</td><td class="num">{cm.get('tn', 0)}</td><td class="num">{cm.get('fp', 0)}</td></tr>
-      <tr><td>Truth spoof</td><td class="num">{cm.get('fn', 0)}</td><td class="num">{cm.get('tp', 0)}</td></tr>
-    </table>
-    <div class="tv-note">
-      Samples: {ev['n']} valid ({ev.get('n_real', 0)} real, {ev.get('n_spoof', 0)} spoof) ·
-      False positives: {ev.get('fp', 0)} · False negatives: {ev.get('fn', 0)}
-    </div>
-    """)
+        cm = ev.get("confusion") or {}
+        render(st, f"""
+        <div class="tv-card" style="margin-top:12px">
+          <div class="tv-card-title">Confusion matrix</div>
+          <table class="tv-table">
+            <tr><th></th><th class="num">Pred authentic</th><th class="num">Pred spoof</th></tr>
+            <tr><td>Truth authentic</td><td class="num">{cm.get('tn', 0)}</td><td class="num">{cm.get('fp', 0)}</td></tr>
+            <tr><td>Truth spoof</td><td class="num">{cm.get('fn', 0)}</td><td class="num">{cm.get('tp', 0)}</td></tr>
+          </table>
+          <div class="tv-note">
+            Samples: {ev['n']} valid ({ev.get('n_real', 0)} real, {ev.get('n_spoof', 0)} spoof) ·
+            False positives: {ev.get('fp', 0)} · False negatives: {ev.get('fn', 0)}
+          </div>
+        </div>
+        """)
 
     if ev.get("false_positives"):
         st.write("False positives (authentic → spoof):", ev["false_positives"])
@@ -85,14 +98,16 @@ def render_evaluation():
         st.write("False negatives (spoof → authentic):", ev["false_negatives"])
 
     n_real, n_spoof = ev.get("n_real", 0), ev.get("n_spoof", 0)
-    render(st, '<div class="tv-section">Threshold</div>')
     render(st, f"""
-    <table class="tv-table">
-      <tr><td>Current threshold</td><td class="num">{st.session_state.bona_threshold:.3f}</td></tr>
-      <tr><td>Decision band</td><td class="num">±{st.session_state.decision_band:.3f}</td></tr>
-      <tr><td>Source</td><td>{st.session_state.threshold_source}</td></tr>
-      <tr><td>Active model</td><td>{MODEL_REGISTRY[st.session_state.model_choice]['label']}</td></tr>
-    </table>
+    <div class="tv-card" style="margin-top:12px">
+      <div class="tv-card-title">Threshold</div>
+      <table class="tv-table">
+        <tr><td>Current threshold</td><td class="num">{st.session_state.bona_threshold:.3f}</td></tr>
+        <tr><td>Decision band</td><td class="num">±{st.session_state.decision_band:.3f}</td></tr>
+        <tr><td>Source</td><td>{st.session_state.threshold_source}</td></tr>
+        <tr><td>Active model</td><td>{MODEL_REGISTRY[st.session_state.model_choice]['label']}</td></tr>
+      </table>
+    </div>
     """)
 
     if ev.get("eer") is not None and ev.get("suggested_threshold") is not None:

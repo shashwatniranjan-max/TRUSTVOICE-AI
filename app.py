@@ -3,7 +3,7 @@
 import streamlit as st
 
 from risk.config import DEFAULT_BONA_THRESHOLD, DEFAULT_DECISION_BAND
-from ui.components import render
+from ui.components import analysis_mode, render
 from ui.console import render_console, render_demo
 from ui.evaluation import render_evaluation
 from ui.reports import render_reports
@@ -26,12 +26,22 @@ NEUTRAL_FACTORS = {
     "Context Safety": 93,
 }
 
-NAV_ITEMS = (
-    "Console",
-    "Demo Scenarios",
-    "Evaluation",
-    "Reports",
-    "Settings",
+NAV_GROUPS = (
+    (
+        "Workspace",
+        (
+            ("Console", "nav_Console", "Console"),
+            ("Demo Scenarios", "nav_Demo Scenarios", "Demo Scenarios"),
+            ("Evaluation Lab", "nav_Evaluation", "Evaluation Lab"),
+        ),
+    ),
+    (
+        "Output",
+        (
+            ("Reports", "nav_Reports", "Reports"),
+            ("Settings", "nav_Settings", "Settings"),
+        ),
+    ),
 )
 
 
@@ -69,37 +79,52 @@ def init_state():
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
-    # Previous builds used "Demo scenarios"
-    if st.session_state.ui_nav == "Demo scenarios":
-        st.session_state.ui_nav = "Demo Scenarios"
+    if st.session_state.ui_nav in {"Demo scenarios", "Evaluation"}:
+        st.session_state.ui_nav = (
+            "Demo Scenarios" if st.session_state.ui_nav == "Demo scenarios" else "Evaluation Lab"
+        )
 
 
 init_state()
 render(st, css())
 
+mode = analysis_mode(st.session_state.get("analysis_source"))
 with st.sidebar:
     render(st, """
-    <div class="tv-brand">TRUSTVOICE AI
-      <span>Conversation security</span>
+    <div class="tv-brand">
+      <div class="tv-mark">TV</div>
+      <div>
+        <strong>TRUSTVOICE AI</strong>
+        <span>Conversation Security</span>
+      </div>
     </div>
     """)
     current = st.session_state.ui_nav
-    for label in NAV_ITEMS:
-        if st.button(
-            label,
-            key=f"nav_{label}",
-            use_container_width=True,
-            type="primary" if current == label else "secondary",
-        ):
-            st.session_state.ui_nav = label
-            st.rerun()
+    for group, items in NAV_GROUPS:
+        render(st, f'<div class="tv-nav-label">{group}</div>')
+        for store, key, label in items:
+            if st.button(
+                label,
+                key=key,
+                use_container_width=True,
+                type="primary" if current == store else "secondary",
+            ):
+                st.session_state.ui_nav = store
+                st.rerun()
+    render(st, f"""
+    <div class="tv-side-foot">
+      <div class="tv-status"><span class="tv-dot"></span>Analysis Engine Online</div>
+      <div>Mode: {mode}</div>
+      <div style="margin-top:8px">SIH prototype · decision support only · not a certified fraud verdict · does not intercept cellular calls</div>
+    </div>
+    """)
 
 nav = st.session_state.ui_nav
 if nav == "Console":
     render_console()
 elif nav == "Demo Scenarios":
     render_demo()
-elif nav == "Evaluation":
+elif nav in {"Evaluation Lab", "Evaluation"}:
     render_evaluation()
 elif nav == "Reports":
     render_reports()
