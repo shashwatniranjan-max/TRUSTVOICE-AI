@@ -281,23 +281,32 @@ def analyze_audio_bytes(
     threshold_source: str = "default (uncalibrated)",
     allow_download: bool = True,
     transcribe: bool = False,
+    on_progress=None,
 ) -> dict:
+    def note(message: str):
+        if on_progress:
+            on_progress(message)
+
+    note("Decoding audio...")
     result = decode_audio_bytes(raw, filename)
     samples = result.pop("samples", None)
     if result.get("limitations") and samples is None:
         result["anti_spoof"] = None
-        result["voice_error"] = "; ".join(result["limitations"])
+        result["voice_error"] = result.get("user_error") or "; ".join(result["limitations"])
         if transcribe:
             from models.asr import transcribe_pcm
             result["asr"] = transcribe_pcm(None, 16000, duration=result.get("duration"))
         return result
     if samples is None:
-        result["voice_error"] = "Audio quality insufficient for reliable authenticity analysis."
+        result["voice_error"] = result.get("user_error") or (
+            "Audio quality insufficient for reliable authenticity analysis."
+        )
         if transcribe:
             from models.asr import transcribe_pcm
             result["asr"] = transcribe_pcm(None, int(result.get("sample_rate") or 16000), duration=result.get("duration"))
         return result
     try:
+        note("Running voice authenticity analysis...")
         anti = run_antispoof_scores(
             samples, int(result["sample_rate"]), model_key, allow_download=allow_download,
         )
@@ -308,11 +317,12 @@ def analyze_audio_bytes(
     except Exception as exc:
         result["limitations"].append(
             "Anti-spoof model unavailable. Interaction analysis can still run, "
-            f"but voice authenticity cannot be established. ({type(exc).__name__}: {exc})"
+            f"but voice authenticity cannot be established. ({type(exc).__name__})"
         )
         result["anti_spoof"] = None
         result["voice_error"] = result["limitations"][-1]
     if transcribe:
+        note("Transcribing conversation...")
         from models.asr import transcribe_pcm
         result["asr"] = transcribe_pcm(
             samples,

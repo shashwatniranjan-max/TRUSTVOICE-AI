@@ -60,10 +60,12 @@ Place a larger W2V2-AASIST ONNX file in `models/` or set `TRUSTVOICE_MODEL_PATH`
 to run a different checkpoint. First-run download is attempted only if the
 file is missing.
 
-ASR weights download once into the Hugging Face cache. On small Render instances
-prefer `TRUSTVOICE_ASR_MODEL=tiny` (default). Use `base` only if RAM allows.
-Clips longer than `TRUSTVOICE_ASR_MAX_SEC` (default 180) are rejected for ASR
-without crashing. Evaluation-lab anti-spoof runs do **not** load Whisper.
+ASR weights download once into the Hugging Face cache **on the server**. End-user
+laptops do not install Whisper. Streamlit Cloud / Codespaces should install
+`packages.txt` (`ffmpeg`) so MP3/M4A/WhatsApp/WebM decode reliably; `imageio-ffmpeg`
+is a bundled fallback. Prefer `TRUSTVOICE_ASR_MODEL=tiny` (default). Clips longer
+than `TRUSTVOICE_ASR_MAX_SEC` (default 120) are transcribed only for the first
+window, with a note. Evaluation-lab anti-spoof runs do **not** load Whisper.
 
 ## Live analysis vs demo scenarios
 

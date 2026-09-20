@@ -6,7 +6,7 @@ import streamlit as st
 
 from demo.scenarios import BENIGN_EXAMPLES, IDENTITY_HELP, SCENARIO_A, SCENARIO_B, SCENARIO_C
 from models.antispoof import analyze_audio_bytes
-from models.asr import asr_model_name, get_whisper_model, resolve_live_transcript
+from models.asr import asr_dependency_status, asr_model_name, get_whisper_model, resolve_live_transcript
 from models.intent import intent_display_name
 from risk.pipeline import analyse_interaction
 from ui.components import (
@@ -54,10 +54,14 @@ def _apply_result(result: dict, source: str, audio=None):
     })
 
 
+def consume_pending_transcript(state):
+    if "pending_console_transcript" in state:
+        state["console_transcript"] = state["pending_console_transcript"]
+        del state["pending_console_transcript"]
+
+
 def _apply_pending_console_transcript():
-    if "pending_console_transcript" in st.session_state:
-        st.session_state.console_transcript = st.session_state.pending_console_transcript
-        del st.session_state.pending_console_transcript
+    consume_pending_transcript(st.session_state)
 
 
 def render_topbar():
@@ -85,6 +89,9 @@ def render_console():
         render(st, '<div class="tv-banner">Demo scenario — scripted transcript and illustrative voice labels. Not a live AASIST verdict.</div>')
     elif mode == "LIVE":
         render(st, '<div class="tv-banner">Live analysis — anti-spoofing and local ASR run on uploaded or microphone audio when provided. Typed transcripts still override ASR.</div>')
+    dep = asr_dependency_status()
+    if not dep.get("ok"):
+        st.warning(dep.get("error") or "ASR is unavailable on the server because the ASR runtime dependency could not be loaded.")
 
     result = st.session_state.get("last_result")
     audio = st.session_state.get("last_analysis") or {}
@@ -105,7 +112,8 @@ def render_console():
         render(st, '<div class="tv-section" style="margin-top:0">Analyze conversation</div>')
         uploaded = st.file_uploader(
             "Audio or video",
-            type=["wav", "mp3", "m4a", "ogg", "flac", "mp4", "webm", "mov"],
+            type=["wav", "mp3", "mpeg", "mpga", "m4a", "aac", "ogg", "opus", "oga",
+                  "flac", "mp4", "webm", "mov", "3gp", "amr"],
             key="console_upload",
         )
         mic = st.audio_input("Microphone capture", key="console_mic")
@@ -148,11 +156,20 @@ def render_console():
             auth_score = None
             asr_result = None
             if raw:
-                with st.spinner("Decoding audio, running anti-spoof, then local ASR…"):
+                try:
+                    status_box = st.status("Analyzing uploaded audio", expanded=True)
+
+                    def _progress(message: str):
+                        status_box.write(message)
+
                     try:
+                        _progress("Loading speech-to-text model...")
                         _cached_asr_model(asr_model_name())
                     except Exception:
-                        pass
+                        _progress(
+                            "ASR is unavailable on the server because the ASR runtime "
+                            "dependency could not be loaded."
+                        )
                     audio_result = analyze_audio_bytes(
                         raw, fname,
                         model_key=st.session_state.model_choice,
@@ -161,16 +178,33 @@ def render_console():
                         threshold_source=st.session_state.threshold_source,
                         allow_download=True,
                         transcribe=True,
+                        on_progress=_progress,
                     )
+                    if audio_result.get("user_error"):
+                        st.session_state.live_warning = audio_result["user_error"]
+                    status_box.update(label="Audio processing finished", state="complete")
+                except Exception as exc:
+                    audio_result = {
+                        "anti_spoof": None,
+                        "asr": {
+                            "status": "error",
+                            "transcript": "",
+                            "error": f"{type(exc).__name__}: {exc}",
+                            "model": asr_model_name(),
+                        },
+                        "user_error": "Audio analysis failed on the server.",
+                        "limitations": [f"{type(exc).__name__}: {exc}"],
+                    }
+                    st.session_state.live_warning = audio_result["user_error"]
                 st.session_state.last_analysis = audio_result
-                asr_result = audio_result.get("asr")
-                if audio_result.get("limitations"):
+                asr_result = (audio_result or {}).get("asr")
+                if audio_result.get("limitations") and not audio_result.get("user_error"):
                     st.warning(" | ".join(audio_result["limitations"]))
                 anti_now = audio_result.get("anti_spoof")
                 if anti_now:
                     voice_label = anti_now.get("voice_label", "INCONCLUSIVE")
                     auth_score = anti_now.get("authenticity_score")
-                else:
+                elif raw:
                     st.info(
                         "Anti-spoof model unavailable. Interaction analysis can still run, "
                         "but voice authenticity cannot be established."
@@ -200,16 +234,18 @@ def render_console():
                     st.session_state.pending_console_transcript = choice["text"]
                     st.session_state.asr_filled_transcript = choice["text"]
                 if choice["analyze"]:
-                    analysed = analyse_interaction(
-                        transcript=choice["text"],
-                        voice_label=voice_label,
-                        identity_status=identity,
-                        authenticity_score=auth_score,
-                        conversation_state=st.session_state.conversation_state,
-                        source="LIVE / MANUAL ANALYSIS",
-                        voice_evidence="model" if auth_score is not None else "unavailable",
-                    )
-                    _apply_result(analysed, "LIVE / UPLOADED ANALYSIS", audio_result)
+                    with st.spinner("Analyzing intent and behaviour..."):
+                        analysed = analyse_interaction(
+                            transcript=choice["text"],
+                            voice_label=voice_label,
+                            identity_status=identity,
+                            authenticity_score=auth_score,
+                            conversation_state=st.session_state.conversation_state,
+                            source="LIVE / MANUAL ANALYSIS",
+                            voice_evidence="model" if auth_score is not None else "unavailable",
+                        )
+                    with st.spinner("Calculating trust score..."):
+                        _apply_result(analysed, "LIVE / UPLOADED ANALYSIS", audio_result)
                 elif raw:
                     st.session_state.analysis_source = "LIVE / UPLOADED ANALYSIS"
                 st.rerun()
@@ -232,7 +268,25 @@ def render_console():
     talk, why = st.columns([1.35, 1], gap="large")
     with talk:
         render(st, '<div class="tv-section">Conversation</div>')
-        render(st, conversation_timeline(utterances_from_transcript(transcript_show)))
+        asr_now = (audio or {}).get("asr") or {}
+        content_unavailable = (
+            (not (transcript_show or "").strip())
+            and asr_now
+            and asr_now.get("status") != "success"
+        )
+        if content_unavailable:
+            render(st, """
+            <div class="tv-note">Conversation content: unavailable</div>
+            """)
+            if asr_now.get("error") or asr_now.get("status"):
+                render(st, f"""
+                <div class="tv-note">
+                  ASR status: {escape(str(asr_now.get('status') or '—'))}
+                  {escape(str(asr_now.get('error') or ''))}
+                </div>
+                """)
+        else:
+            render(st, conversation_timeline(utterances_from_transcript(transcript_show)))
         if result:
             beh_bits = list(behaviour.get("signals") or [])
             beh_text = ", ".join(beh_bits) if beh_bits else str(behaviour.get("behaviour_level", "LOW"))
@@ -315,7 +369,11 @@ def render_console():
                 "duration": asr_info.get("duration"),
                 "detected_language": asr_info.get("language"),
                 "processing_time_sec": asr_info.get("elapsed_sec"),
+                "truncated": asr_info.get("truncated"),
+                "asr_error": asr_info.get("error"),
                 "transcript_source": st.session_state.get("transcript_source") or "NONE",
+                "decode_path": audio.get("decode_path") if audio else None,
+                "ffmpeg": audio.get("ffmpeg") if audio else None,
             })
             st.caption("ASR is local faster-whisper on CPU. It is not a guarantee of transcription accuracy and does not decide whether a voice is synthetic.")
         st.caption(

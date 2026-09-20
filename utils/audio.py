@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -23,6 +24,12 @@ AASIST_WINDOW = 64600
 AASIST_HOP = 32300
 AASIST_MAX_WINDOWS = 7
 MAX_INPUT_BYTES = 200 * 1024 * 1024
+DECODE_FORMAT_HELP = (
+    "Audio format could not be decoded. Please upload WAV, MP3, M4A, OGG, or WebM."
+)
+FFMPEG_TIMEOUT_SEC = 90
+_FFMPEG_EXE = None
+_FFMPEG_CHECKED = False
 
 
 def speech_ratio(chunk, floor: float = 0.006) -> float:
@@ -153,76 +160,189 @@ def waveform_envelope(audio, bars: int = 48) -> list[int]:
     return [int(8 + 90 * (v / peak)) for v in env[:bars]]
 
 
+def sniff_audio_kind(raw: bytes, filename: str = "") -> str:
+    suffix = Path(filename or "").suffix.lower().lstrip(".")
+    head = raw[:16] if raw else b""
+    if len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WAVE":
+        return "wav"
+    if head.startswith(b"fLaC"):
+        return "flac"
+    if head.startswith(b"OggS"):
+        return "ogg"
+    if head.startswith(b"\x1aE\xdf\xa3"):
+        return "webm"
+    if len(raw) >= 8 and raw[4:8] == b"ftyp":
+        return "mp4"
+    if head.startswith(b"ID3") or (
+        len(head) >= 2 and head[0] == 0xFF and (head[1] & 0xE0) == 0xE0
+    ):
+        return "mp3"
+    aliases = {
+        "mpga": "mp3", "mpeg": "mp3", "mp2": "mp3",
+        "opus": "ogg", "oga": "ogg",
+        "m4a": "mp4", "aac": "mp4", "3gp": "mp4", "3gpp": "mp4", "amr": "amr",
+        "weba": "webm",
+    }
+    return aliases.get(suffix, suffix or "unknown")
+
+
+def ffmpeg_executable() -> str | None:
+    global _FFMPEG_EXE, _FFMPEG_CHECKED
+    if _FFMPEG_CHECKED:
+        return _FFMPEG_EXE
+    _FFMPEG_CHECKED = True
+    found = shutil.which("ffmpeg")
+    if found:
+        _FFMPEG_EXE = found
+        return _FFMPEG_EXE
+    try:
+        import imageio_ffmpeg
+        _FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        _FFMPEG_EXE = None
+    return _FFMPEG_EXE
+
+
+def ffmpeg_available() -> bool:
+    return bool(ffmpeg_executable())
+
+
+def _ffmpeg_to_wav16k(raw: bytes, suffix: str) -> tuple[bytes | None, str | None]:
+    exe = ffmpeg_executable()
+    if not exe:
+        return None, "FFmpeg is not available on the server; compressed audio cannot be decoded."
+    ext = suffix if suffix.startswith(".") else f".{suffix or 'bin'}"
+    if ext == ".unknown":
+        ext = ".bin"
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = Path(tmpdir) / f"input{ext}"
+            wav_path = Path(tmpdir) / "canonical.wav"
+            input_path.write_bytes(raw)
+            proc = subprocess.run(
+                [
+                    exe, "-y", "-i", str(input_path),
+                    "-vn", "-ac", "1", "-ar", "16000",
+                    "-c:a", "pcm_s16le", str(wav_path),
+                ],
+                capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SEC,
+            )
+            if proc.returncode != 0 or not wav_path.exists() or wav_path.stat().st_size < 44:
+                err = (proc.stderr or proc.stdout or "").strip()[-240:] or "no audio track"
+                return None, err
+            return wav_path.read_bytes(), None
+    except subprocess.TimeoutExpired:
+        return None, "Audio conversion timed out."
+    except Exception as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+
+
+def _pcm_from_wav_bytes(wav_bytes: bytes):
+    if np is None:
+        return None
+    try:
+        import soundfile as sf
+        data, sr = sf.read(io.BytesIO(wav_bytes), dtype="float32", always_2d=False)
+        y = np.asarray(data, dtype=np.float32).reshape(-1)
+        if int(sr) != 16000 and librosa is not None:
+            y = librosa.resample(y, orig_sr=int(sr), target_sr=16000, res_type="kaiser_fast")
+            sr = 16000
+        return np.ascontiguousarray(y, dtype=np.float32), int(sr)
+    except Exception:
+        pass
+    if librosa is None:
+        return None
+    try:
+        y, sr = librosa.load(io.BytesIO(wav_bytes), sr=16000, mono=True)
+        return np.ascontiguousarray(np.asarray(y, dtype=np.float32).reshape(-1)), 16000
+    except Exception:
+        return None
+
+
+def _try_direct_pcm(raw: bytes):
+    loaded = _pcm_from_wav_bytes(raw)
+    if loaded is not None:
+        return loaded
+    if librosa is None:
+        return None
+    try:
+        y, sr = librosa.load(io.BytesIO(raw), sr=16000, mono=True)
+        y = np.ascontiguousarray(np.asarray(y, dtype=np.float32).reshape(-1))
+        if y.size == 0:
+            return None
+        return y, 16000
+    except Exception:
+        return None
+
+
 def decode_audio_bytes(raw: bytes, filename: str) -> dict:
-    original_suffix = Path(filename).suffix.lower()
+    kind = sniff_audio_kind(raw, filename)
     result = {
         "file": filename,
         "file_hash": hashlib.sha256(raw).hexdigest()[:16],
-        "format": original_suffix.lstrip(".") or "unknown",
+        "format": kind,
         "duration": None, "sample_rate": None, "channels": None,
         "rms": None, "zero_crossing_rate": None, "spectral_centroid": None,
-        "analysis_mode": "Metadata / acoustic checks",
+        "analysis_mode": "Canonical 16 kHz mono PCM",
         "limitations": [], "anti_spoof": None, "quality_gate": None,
-        "envelope": [], "samples": None,
+        "envelope": [], "samples": None, "user_error": None,
+        "ffmpeg": bool(ffmpeg_executable()) if _FFMPEG_CHECKED else None,
+        "decode_path": None,
     }
     if len(raw) > MAX_INPUT_BYTES:
-        result["limitations"].append(
-            f"File exceeds the {MAX_INPUT_BYTES // (1024 * 1024)} MB analysis limit."
-        )
+        result["user_error"] = f"File exceeds the {MAX_INPUT_BYTES // (1024 * 1024)} MB analysis limit."
+        result["limitations"].append(result["user_error"])
         return result
-    if np is None or librosa is None:
-        result["limitations"].append(
-            "numpy and librosa are required. Run: pip install numpy librosa"
-        )
+    if np is None:
+        result["user_error"] = "Audio decoding is unavailable on the server."
+        result["limitations"].append(result["user_error"])
         return result
 
-    analysis_raw, analysis_suffix = raw, original_suffix
-    if original_suffix in {".mp4", ".webm", ".mov", ".mkv", ".avi"}:
-        try:
-            import imageio_ffmpeg
-            ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-            with tempfile.TemporaryDirectory() as tmpdir:
-                input_path = Path(tmpdir) / f"input{original_suffix}"
-                wav_path = Path(tmpdir) / "extracted_audio.wav"
-                input_path.write_bytes(raw)
-                proc = subprocess.run(
-                    [ffmpeg_exe, "-y", "-i", str(input_path), "-vn", "-ac", "1",
-                     "-ar", "16000", "-c:a", "pcm_s16le", str(wav_path)],
-                    capture_output=True, text=True, timeout=180,
-                )
-                if proc.returncode != 0 or not wav_path.exists():
-                    raise RuntimeError(
-                        proc.stderr.strip()[-500:] or "FFmpeg found no audio track."
-                    )
-                analysis_raw = wav_path.read_bytes()
-                result["analysis_mode"] = "Video audio extraction + canonical 16 kHz preprocessing"
-        except Exception as exc:
-            result["limitations"].append(
-                f"Video audio extraction failed: {exc}. Install imageio-ffmpeg and retry."
-            )
-            return result
+    loaded = None
+    if kind in {"wav", "flac"}:
+        loaded = _try_direct_pcm(raw)
+        if loaded is not None:
+            result["decode_path"] = "direct"
+    if loaded is None:
+        wav_bytes, ferr = _ffmpeg_to_wav16k(raw, kind if kind != "unknown" else Path(filename).suffix.lower())
+        if wav_bytes:
+            loaded = _pcm_from_wav_bytes(wav_bytes)
+            if loaded is not None:
+                result["decode_path"] = "ffmpeg"
+                result["analysis_mode"] = "FFmpeg canonical 16 kHz mono PCM"
+        elif ferr:
+            result["limitations"].append(ferr)
+        if loaded is None:
+            loaded = _try_direct_pcm(raw)
+            if loaded is not None:
+                result["decode_path"] = "direct-fallback"
 
-    try:
-        y, sr = librosa.load(io.BytesIO(analysis_raw), sr=16000, mono=True)
-        y = np.asarray(y, dtype=np.float32).reshape(-1)
-        if y.size == 0:
-            raise ValueError("Decoded stream contains no samples.")
-        result["duration"] = round(float(len(y) / sr), 2)
-        result["sample_rate"] = int(sr)
-        result["channels"] = 1
-        result["quality_gate"] = quality_gate(y, sr)
-        result["rms"] = round(float(np.sqrt(np.mean(np.square(y, dtype=np.float64)))), 5)
-        result["zero_crossing_rate"] = round(
-            float(np.mean(librosa.feature.zero_crossing_rate(y)[0])), 5
+    if loaded is None:
+        result["user_error"] = DECODE_FORMAT_HELP
+        result["limitations"].append(DECODE_FORMAT_HELP)
+        return result
+
+    y, sr = loaded
+    y = np.ascontiguousarray(np.asarray(y, dtype=np.float32).reshape(-1))
+    if y.size == 0:
+        result["user_error"] = DECODE_FORMAT_HELP
+        result["limitations"].append("Decoded stream contains no samples.")
+        return result
+    if int(sr) != 16000 and librosa is not None:
+        y = np.ascontiguousarray(
+            librosa.resample(y, orig_sr=int(sr), target_sr=16000, res_type="kaiser_fast"),
+            dtype=np.float32,
         )
-        result["spectral_centroid"] = round(
-            float(np.mean(librosa.feature.spectral_centroid(y=y, sr=sr))), 2
-        )
-        result["input_fingerprint"] = hashlib.sha256(
-            y.tobytes() + str(int(sr)).encode("utf-8")
-        ).hexdigest()[:16]
-        result["envelope"] = waveform_envelope(y)
-        result["samples"] = y
-    except Exception as exc:
-        result["limitations"].append(f"Canonical audio decode failed: {exc}")
+        sr = 16000
+    result["duration"] = round(float(len(y) / sr), 2)
+    result["sample_rate"] = int(sr)
+    result["channels"] = 1
+    result["quality_gate"] = quality_gate(y, sr)
+    result["rms"] = round(float(np.sqrt(np.mean(np.square(y, dtype=np.float64)))), 5)
+    result["input_fingerprint"] = hashlib.sha256(
+        y.tobytes() + str(int(sr)).encode("utf-8")
+    ).hexdigest()[:16]
+    result["envelope"] = waveform_envelope(y)
+    result["samples"] = y
+    result["ffmpeg"] = ffmpeg_available()
     return result
