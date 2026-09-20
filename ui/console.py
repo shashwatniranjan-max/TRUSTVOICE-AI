@@ -54,6 +54,12 @@ def _apply_result(result: dict, source: str, audio=None):
     })
 
 
+def _apply_pending_console_transcript():
+    if "pending_console_transcript" in st.session_state:
+        st.session_state.console_transcript = st.session_state.pending_console_transcript
+        del st.session_state.pending_console_transcript
+
+
 def render_topbar():
     source = st.session_state.get("analysis_source") or "Idle"
     mode = analysis_mode(source)
@@ -71,6 +77,7 @@ def render_topbar():
 
 
 def render_console():
+    _apply_pending_console_transcript()
     render_topbar()
     source = st.session_state.get("analysis_source") or "Idle"
     mode = analysis_mode(source)
@@ -190,7 +197,7 @@ def render_console():
                 st.session_state.transcript_source = choice["source"]
                 st.session_state.live_warning = choice["warning"]
                 if choice["source"] == "ASR" and choice["text"]:
-                    st.session_state.console_transcript = choice["text"]
+                    st.session_state.pending_console_transcript = choice["text"]
                     st.session_state.asr_filled_transcript = choice["text"]
                 if choice["analyze"]:
                     analysed = analyse_interaction(
