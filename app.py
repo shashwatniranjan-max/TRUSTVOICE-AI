@@ -8,6 +8,7 @@ from ui.console import render_console, render_demo
 from ui.evaluation import render_evaluation
 from ui.reports import render_reports
 from ui.settings import render_settings
+from ui.speakers import render_speakers
 from ui.theme import css
 from utils.state import new_conversation_state
 
@@ -32,6 +33,7 @@ NAV_GROUPS = (
         (
             ("Console", "nav_Console", "Console"),
             ("Demo Scenarios", "nav_Demo Scenarios", "Demo Scenarios"),
+            ("Speaker Gallery", "nav_Speaker Gallery", "Speaker Gallery"),
             ("Evaluation Lab", "nav_Evaluation", "Evaluation Lab"),
         ),
     ),
@@ -124,6 +126,8 @@ if nav == "Console":
     render_console()
 elif nav == "Demo Scenarios":
     render_demo()
+elif nav == "Speaker Gallery":
+    render_speakers()
 elif nav in {"Evaluation Lab", "Evaluation"}:
     render_evaluation()
 elif nav == "Reports":
