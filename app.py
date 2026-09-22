@@ -8,6 +8,7 @@ from ui.console import render_console, render_demo
 from ui.evaluation import render_evaluation
 from ui.reports import render_reports
 from ui.settings import render_settings
+from ui.speakers import render_speakers
 from ui.theme import css
 from utils.state import new_conversation_state
 
@@ -33,6 +34,7 @@ NAV_GROUPS = (
             ("Console", "nav_Console", "Console"),
             ("Demo Scenarios", "nav_Demo Scenarios", "Demo Scenarios"),
             ("Evaluation Lab", "nav_Evaluation", "Evaluation Lab"),
+            ("Trusted Speakers", "nav_Trusted Speakers", "Trusted Speakers"),
         ),
     ),
     (
@@ -130,6 +132,8 @@ elif nav == "Reports":
     render_reports()
 elif nav == "Settings":
     render_settings()
+elif nav == "Trusted Speakers":
+    render_speakers()
 
 render(st, """
 <div class="tv-footer">

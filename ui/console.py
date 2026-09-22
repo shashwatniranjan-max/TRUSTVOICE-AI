@@ -74,6 +74,7 @@ PAGE_COPY = {
     "Evaluation Lab": ("Evaluation Lab", "Score labelled audio files. Metrics appear only after a real labelled run."),
     "Reports": ("Reports", "Export the latest analysis as an incident summary."),
     "Settings": ("Settings", "Prototype analysis controls that already affect this application."),
+    "Trusted Speakers": ("Trusted Speakers", "Enroll voice profiles for known speakers. Profiles persist locally across restarts."),
 }
 
 
