@@ -56,8 +56,34 @@ def status_color(label: str) -> str:
     return STATUS_COLOR.get(str(label).upper(), COLORS["gray"])
 
 
+COLORS_DARK = {
+    "bg": "#0B1120",
+    "bg2": "#111827",
+    "surface": "#1F2937",
+    "surface2": "#374151",
+    "elevated": "#111827",
+    "border": "#374151",
+    "border2": "#4B5563",
+    "text": "#F9FAFB",
+    "muted": "#9CA3AF",
+    "dim": "#6B7280",
+    "accent": "#3B82F6",
+    "accent_light": "#1E3A8A",
+    "accent2": "#2563EB",
+    "green": "#10B981",
+    "green_light": "#064E3B",
+    "amber": "#F59E0B",
+    "amber_light": "#78350F",
+    "red": "#EF4444",
+    "red_light": "#7F1D1D",
+    "gray": "#9CA3AF",
+    "sidebar": "#111827",
+}
+
 def css() -> str:
-    c = COLORS
+    from streamlit import session_state
+    dark_mode = session_state.get("theme") == "dark"
+    c = COLORS_DARK if dark_mode else COLORS
     return f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700&display=swap');

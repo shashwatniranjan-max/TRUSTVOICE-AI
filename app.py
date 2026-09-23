@@ -152,6 +152,30 @@ with st.sidebar:
                 st.session_state.ui_nav = store
                 st.rerun()
 
+    # Theme toggle
+    if "theme" not in st.session_state:
+        st.session_state.theme = "light"
+        
+    theme_icon = "🌙" if st.session_state.theme == "light" else "☀️"
+    theme_label = "Dark Mode" if st.session_state.theme == "light" else "Light Mode"
+    
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    if st.button(f"{theme_icon} {theme_label}", use_container_width=True, key="theme_toggle"):
+        new_theme = "dark" if st.session_state.theme == "light" else "light"
+        st.session_state.theme = new_theme
+        
+        # Rewrite Streamlit config to apply the native theme
+        import os
+        config_path = ".streamlit/config.toml"
+        os.makedirs(".streamlit", exist_ok=True)
+        with open(config_path, "w") as f:
+            if new_theme == "dark":
+                f.write('[theme]\nbase="dark"\nprimaryColor="#2563D6"\n')
+            else:
+                f.write('[theme]\nbase="light"\nprimaryColor="#2563D6"\nbackgroundColor="#F7F9FC"\nsecondaryBackgroundColor="#F1F5F9"\ntextColor="#182235"\n')
+                
+        st.rerun()
+
     # Bottom status card
     _render_html("""
     <div style="flex:1"></div>
