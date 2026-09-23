@@ -98,6 +98,12 @@ def render_analyze():
     if not dep.get("ok"):
         st.warning(dep.get("error") or "ASR is unavailable — transcription will be skipped.")
 
+    # Pre-apply any staged ASR transcript BEFORE widgets are instantiated.
+    # Writing to a widget's session_state key AFTER the widget renders causes
+    # StreamlitWidgetAlreadyInstantiatedError — so we stage via a separate key.
+    if "_asr_transcript_pending" in st.session_state:
+        st.session_state["analyze_transcript"] = st.session_state.pop("_asr_transcript_pending")
+
     audio = st.session_state.get("last_analysis") or {}
     result = st.session_state.get("last_result")
 
@@ -110,8 +116,8 @@ def render_analyze():
         <div class="tv-card">
           <div class="tv-card-title">Analysis pipeline</div>
           {pipeline_html}
-          <div style="margin-top:12px;padding:10px;background:#F8FAFF;border-radius:6px;
-            border:1px solid #E2E8F0;font-size:12px;color:#64748B;line-height:1.55">
+          <div style="margin-top:12px;padding:10px;background:var(--tv-surface);border-radius:6px;
+            border:1px solid var(--tv-border);font-size:12px;color:var(--tv-muted);line-height:1.55">
             Uploaded audio is handled by the existing analysis pipeline.
             This interface does not alter audio preprocessing or model execution.
           </div>
@@ -157,16 +163,16 @@ def render_analyze():
         render(f"""
         <div style="display:flex;gap:24px;margin:14px 0 4px">
           <div>
-            <div style="font-size:11.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Filename</div>
-            <div style="font-size:14px;font-weight:600;color:#182235">{escape(fname)}</div>
+            <div style="font-size:11.5px;color:var(--tv-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Filename</div>
+            <div style="font-size:14px;font-weight:600;color:var(--tv-text)">{escape(fname)}</div>
           </div>
           <div>
-            <div style="font-size:11.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Duration</div>
-            <div style="font-size:14px;font-weight:600;color:#182235">{escape(dur_str)}</div>
+            <div style="font-size:11.5px;color:var(--tv-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Duration</div>
+            <div style="font-size:14px;font-weight:600;color:var(--tv-text)">{escape(dur_str)}</div>
           </div>
           <div>
-            <div style="font-size:11.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Format</div>
-            <div style="font-size:14px;font-weight:600;color:#182235">{escape(fmt_str)}</div>
+            <div style="font-size:11.5px;color:var(--tv-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Format</div>
+            <div style="font-size:14px;font-weight:600;color:var(--tv-text)">{escape(fmt_str)}</div>
           </div>
         </div>
         """)
@@ -222,10 +228,10 @@ def render_analyze():
                 <span class="tv-badge {'tv-badge-crit' if imp_risk >= 80 else ('tv-badge-warn' if imp_risk >= 55 else 'tv-badge-blue')}"
                   style="margin-left:8px">{escape(str(risk_label).replace('_', ' ').title())}</span>
               </div>
-              <div class="tv-evidence-row"><span class="tv-evidence-label">Voice authenticity</span><span style="font-size:13px;font-weight:500;color:#182235">{escape(str(result.get('voice_display') or result.get('voice_label') or '—'))}</span></div>
-              <div class="tv-evidence-row"><span class="tv-evidence-label">Speaker identity</span><span style="font-size:13px;font-weight:500;color:#182235">{escape(str(result.get('identity_status', '—')).replace('_', ' '))}</span></div>
-              <div class="tv-evidence-row"><span class="tv-evidence-label">Intent</span><span style="font-size:13px;font-weight:500;color:#182235">{escape(str((result.get('intent') or {{}}).get('intent', '—')).replace('_', ' ').title())}</span></div>
-              <div class="tv-evidence-row" style="border-bottom:0"><span class="tv-evidence-label">Decision</span><span style="font-size:13px;font-weight:500;color:#182235">{escape(str(result.get('action', '—')).replace('_', ' ').title())}</span></div>
+              <div class="tv-evidence-row"><span class="tv-evidence-label">Voice authenticity</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(str(result.get('voice_display') or result.get('voice_label') or '—'))}</span></div>
+              <div class="tv-evidence-row"><span class="tv-evidence-label">Speaker identity</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(str(result.get('identity_status', '—')).replace('_', ' '))}</span></div>
+              <div class="tv-evidence-row"><span class="tv-evidence-label">Intent</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(str((result.get('intent') or {{}}).get('intent', '—')).replace('_', ' ').title())}</span></div>
+              <div class="tv-evidence-row" style="border-bottom:0"><span class="tv-evidence-label">Decision</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(str(result.get('action', '—')).replace('_', ' ').title())}</span></div>
             </div>
             """)
 
@@ -330,7 +336,10 @@ def render_analyze():
                 st.session_state.transcript_source = choice["source"]
                 st.session_state.live_warning = choice["warning"]
                 if choice["source"] == "ASR" and choice["text"]:
-                    st.session_state.analyze_transcript = choice["text"]
+                    # Stage the ASR text — applied to the widget key at the
+                    # TOP of render_analyze() on the next run, before the
+                    # text_area widget is created (avoids StreamlitWidgetAlreadyInstantiatedError)
+                    st.session_state["_asr_transcript_pending"] = choice["text"]
                     st.session_state.asr_filled_transcript = choice["text"]
                 if choice["analyze"]:
                     with st.spinner("Fusing risk signals…"):

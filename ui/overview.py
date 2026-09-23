@@ -31,8 +31,8 @@ def _render_progression_card(stages_risk: list[int], label: str):
       .wrap {{padding:0;}}
       .head {{display:flex;justify-content:space-between;align-items:center;
               margin-bottom:10px;}}
-      .title {{font-size:14px;font-weight:600;color:#182235;}}
-      .meta  {{font-size:12px;color:#94A3B8;}}
+      .title {{font-size:14px;font-weight:600;color:var(--tv-text);}}
+      .meta  {{font-size:12px;color:var(--tv-dim);}}
     </style>
     </head>
     <body>
@@ -167,7 +167,7 @@ def _progression_svg(stages_risk: list[int]) -> str:
     grids = ""
     for y_pct in [0.25, 0.5, 0.75]:
         gy = pad_t + chart_h * y_pct
-        grids += f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{w - pad_r}" y2="{gy:.1f}" stroke="#E2E8F0" stroke-width="1"/>'
+        grids += f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{w - pad_r}" y2="{gy:.1f}" stroke="var(--tv-border)" stroke-width="1"/>'
 
     # Area fill
     pts_area = " ".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys))
@@ -183,7 +183,7 @@ def _progression_svg(stages_risk: list[int]) -> str:
     for x, y in zip(xs, ys):
         circles += (
             f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4.5" '
-            f'fill="#FFFFFF" stroke="#2563D6" stroke-width="2.5"/>'
+            f'fill="var(--tv-surface)" stroke="#2563D6" stroke-width="2.5"/>'
         )
 
     # Labels
@@ -192,13 +192,13 @@ def _progression_svg(stages_risk: list[int]) -> str:
         parts = lab.split("\n")
         label_els += (
             f'<text x="{x:.1f}" y="{h - 8}" text-anchor="middle" '
-            f'font-size="10.5" fill="#94A3B8" font-family="Inter,system-ui">'
+            f'font-size="10.5" fill="var(--tv-dim)" font-family="Inter,system-ui">'
             f'{escape(parts[0])}</text>'
         )
         if len(parts) > 1:
             label_els += (
                 f'<text x="{x:.1f}" y="{h}" text-anchor="middle" '
-                f'font-size="11" fill="#64748B" font-family="Inter,system-ui">'
+                f'font-size="11" fill="var(--tv-muted)" font-family="Inter,system-ui">'
                 f'{escape(parts[1])}</text>'
             )
 
@@ -265,7 +265,7 @@ def _evidence_summary_html(result: dict) -> str:
         html += f"""
         <div class="tv-evidence-row">
           <span class="tv-evidence-label">{escape(label)}</span>
-          <span style="color:#182235;font-weight:500;font-size:13px">{escape(str(val))}</span>
+          <span style="color:var(--tv-text);font-weight:500;font-size:13px">{escape(str(val))}</span>
         </div>"""
     return html
 
@@ -431,14 +431,14 @@ def render_overview():
             ev_html = _evidence_summary_html(result)
         else:
             ev_html = """
-            <div class="tv-evidence-row"><span class="tv-evidence-label">Voice authenticity</span><span style="color:#182235;font-weight:500;font-size:13px">Suspicious</span></div>
-            <div class="tv-evidence-row"><span class="tv-evidence-label">Speaker identity</span><span style="color:#182235;font-weight:500;font-size:13px">Mismatch</span></div>
-            <div class="tv-evidence-row"><span class="tv-evidence-label">Transcript</span><span style="color:#182235;font-weight:500;font-size:13px">Hi, this is Rahul…</span></div>
-            <div class="tv-evidence-row"><span class="tv-evidence-label">Intent</span><span style="color:#182235;font-weight:500;font-size:13px">OTP request</span></div>
-            <div class="tv-evidence-row"><span class="tv-evidence-label">Behaviour</span><span style="color:#182235;font-weight:500;font-size:13px">Urgency</span></div>
-            <div class="tv-evidence-row"><span class="tv-evidence-label">Context</span><span style="color:#182235;font-weight:500;font-size:13px">Sensitive action</span></div>
-            <div class="tv-evidence-row"><span class="tv-evidence-label">Final risk</span><span style="color:#182235;font-weight:500;font-size:13px">CRITICAL</span></div>
-            <div class="tv-evidence-row"><span class="tv-evidence-label">Decision</span><span style="color:#182235;font-weight:500;font-size:13px">Verify identity</span></div>
+            <div class="tv-evidence-row"><span class="tv-evidence-label">Voice authenticity</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">Suspicious</span></div>
+            <div class="tv-evidence-row"><span class="tv-evidence-label">Speaker identity</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">Mismatch</span></div>
+            <div class="tv-evidence-row"><span class="tv-evidence-label">Transcript</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">Hi, this is Rahul…</span></div>
+            <div class="tv-evidence-row"><span class="tv-evidence-label">Intent</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">OTP request</span></div>
+            <div class="tv-evidence-row"><span class="tv-evidence-label">Behaviour</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">Urgency</span></div>
+            <div class="tv-evidence-row"><span class="tv-evidence-label">Context</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">Sensitive action</span></div>
+            <div class="tv-evidence-row"><span class="tv-evidence-label">Final risk</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">CRITICAL</span></div>
+            <div class="tv-evidence-row"><span class="tv-evidence-label">Decision</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">Verify identity</span></div>
             """
         render(f"""
         <div class="tv-card">
@@ -471,12 +471,12 @@ def render_overview():
           <div class="tv-section-head">
             <span class="tv-section-head-title">Transcript & intelligence</span>
           </div>
-          <div style="font-size:14px;color:#182235;line-height:1.6;padding:8px 0;border-bottom:1px solid #E2E8F0;margin-bottom:10px;font-style:italic">
+          <div style="font-size:14px;color:var(--tv-text);line-height:1.6;padding:8px 0;border-bottom:1px solid var(--tv-border);margin-bottom:10px;font-style:italic">
             {transcript_body}
           </div>
-          <div class="tv-evidence-row"><span class="tv-evidence-label">Intent</span><span style="color:#182235;font-weight:500;font-size:13px">{escape(intent_str)}</span></div>
-          <div class="tv-evidence-row"><span class="tv-evidence-label">Behaviour</span><span style="color:#182235;font-weight:500;font-size:13px">{escape(behaviour_str)}</span></div>
-          <div class="tv-evidence-row" style="border-bottom:0"><span class="tv-evidence-label">Context</span><span style="color:#182235;font-weight:500;font-size:13px">{escape(context_str)}</span></div>
+          <div class="tv-evidence-row"><span class="tv-evidence-label">Intent</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">{escape(intent_str)}</span></div>
+          <div class="tv-evidence-row"><span class="tv-evidence-label">Behaviour</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">{escape(behaviour_str)}</span></div>
+          <div class="tv-evidence-row" style="border-bottom:0"><span class="tv-evidence-label">Context</span><span style="color:var(--tv-text);font-weight:500;font-size:13px">{escape(context_str)}</span></div>
         </div>
         """)
 
@@ -507,15 +507,15 @@ def render_overview():
             status = hs_result.get("status", "")
             color = "#16A34A" if status == "CONFIRMED" else "#DC2626"
             render(f"""
-            <div style="margin-top:8px;padding:10px 14px;border-radius:6px;background:#F8FAFF;
-              border:1px solid #E2E8F0;font-size:13px;color:{color};font-weight:500">
+            <div style="margin-top:8px;padding:10px 14px;border-radius:6px;background:var(--tv-surface);
+              border:1px solid var(--tv-border);font-size:13px;color:{color};font-weight:500">
               {escape(status)}: {escape(hs_result.get('message', ''))}
             </div>
             """)
         st.caption("Prototype / simulated — does not contact a manager, device, or bank.")
 
     # ── Nav to Analyze Audio ─────────────────────────────────────────────────
-    render("""<div style="margin-top:16px;padding-top:14px;border-top:1px solid #E2E8F0">""")
+    render("""<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--tv-border)">""")
     c1, c2 = st.columns([1, 3])
     with c1:
         if st.button("→ Analyze new audio", use_container_width=True, type="primary", key="ov_goto_analyze"):

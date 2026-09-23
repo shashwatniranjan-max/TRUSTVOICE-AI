@@ -4,7 +4,7 @@ COLORS = {
     "bg": "#F7F9FC",
     "bg2": "#F1F5F9",
     "surface": "#FFFFFF",
-    "surface2": "#F8FAFF",
+    "surface2": "var(--tv-surface)",
     "elevated": "#F1F5F9",
     "border": "#E2E8F0",
     "border2": "#CBD5E1",
@@ -87,6 +87,15 @@ def css() -> str:
     return f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700&display=swap');
+
+:root {{
+  --tv-text: {c['text']};
+  --tv-muted: {c['muted']};
+  --tv-dim: {c['dim']};
+  --tv-border: {c['border']};
+  --tv-bg: {c['bg']};
+  --tv-surface: {c['surface']};
+}}
 
 /* ── Reset / Base ─────────────────────────────────────────────────────────── */
 html, body, [data-testid="stApp"], [data-testid="stAppViewContainer"] {{

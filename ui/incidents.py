@@ -118,8 +118,8 @@ def _incident_detail_html(inc: dict) -> str:
     <div class="tv-card" style="border-top:3px solid {'#DC2626' if risk >= 80 else ('#D97706' if risk >= 55 else '#16A34A')}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
         <div>
-          <div style="font-size:18px;font-weight:700;color:#182235;margin-bottom:3px">{escape(inc['id'])}</div>
-          <div style="font-size:13px;color:#64748B">{escape(inc['type'])}</div>
+          <div style="font-size:18px;font-weight:700;color:var(--tv-text);margin-bottom:3px">{escape(inc['id'])}</div>
+          <div style="font-size:13px;color:var(--tv-muted)">{escape(inc['type'])}</div>
         </div>
         <span class="tv-badge {risk_cls}" style="font-size:14px;padding:4px 12px">
           {risk} / 100
@@ -129,18 +129,18 @@ def _incident_detail_html(inc: dict) -> str:
       <div class="tv-section-head" style="margin-bottom:8px">
         <span class="tv-section-head-title">Evidence</span>
       </div>
-      <div class="tv-evidence-row"><span class="tv-evidence-label">Speaker</span><span style="font-size:13px;font-weight:500;color:#182235">{escape(inc['speaker'])}</span></div>
-      <div class="tv-evidence-row"><span class="tv-evidence-label">Voice authenticity</span><span style="font-size:13px;font-weight:500;color:#182235">{escape(voice_str)}</span></div>
-      <div class="tv-evidence-row"><span class="tv-evidence-label">Identity evidence</span><span style="font-size:13px;font-weight:500;color:#182235">{escape(identity_str)}</span></div>
-      <div class="tv-evidence-row"><span class="tv-evidence-label">Intent</span><span style="font-size:13px;font-weight:500;color:#182235">{escape(intent_str)}</span></div>
-      <div class="tv-evidence-row"><span class="tv-evidence-label">Behaviour</span><span style="font-size:13px;font-weight:500;color:#182235">{escape(inc.get('behaviour', '—'))}</span></div>
-      <div class="tv-evidence-row"><span class="tv-evidence-label">Context</span><span style="font-size:13px;font-weight:500;color:#182235">{escape(inc.get('context', '—'))}</span></div>
-      <div class="tv-evidence-row"><span class="tv-evidence-label">Trust handshake</span><span style="font-size:13px;font-weight:500;color:#182235">{handshake_str}</span></div>
-      <div class="tv-evidence-row" style="border-bottom:0"><span class="tv-evidence-label">Action taken</span><span style="font-size:13px;font-weight:600;color:#182235">{escape(inc['action'])}</span></div>
+      <div class="tv-evidence-row"><span class="tv-evidence-label">Speaker</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(inc['speaker'])}</span></div>
+      <div class="tv-evidence-row"><span class="tv-evidence-label">Voice authenticity</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(voice_str)}</span></div>
+      <div class="tv-evidence-row"><span class="tv-evidence-label">Identity evidence</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(identity_str)}</span></div>
+      <div class="tv-evidence-row"><span class="tv-evidence-label">Intent</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(intent_str)}</span></div>
+      <div class="tv-evidence-row"><span class="tv-evidence-label">Behaviour</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(inc.get('behaviour', '—'))}</span></div>
+      <div class="tv-evidence-row"><span class="tv-evidence-label">Context</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(inc.get('context', '—'))}</span></div>
+      <div class="tv-evidence-row"><span class="tv-evidence-label">Trust handshake</span><span style="font-size:13px;font-weight:500;color:var(--tv-text)">{handshake_str}</span></div>
+      <div class="tv-evidence-row" style="border-bottom:0"><span class="tv-evidence-label">Action taken</span><span style="font-size:13px;font-weight:600;color:var(--tv-text)">{escape(inc['action'])}</span></div>
 
-      <div style="margin-top:14px;padding:12px;background:#F8FAFF;border-radius:6px;border:1px solid #E2E8F0">
-        <div style="font-size:11.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Transcript</div>
-        <div style="font-size:13.5px;color:#182235;line-height:1.6;font-style:italic">"{escape(inc.get('transcript', ''))}"</div>
+      <div style="margin-top:14px;padding:12px;background:var(--tv-bg);border-radius:6px;border:1px solid var(--tv-border)">
+        <div style="font-size:11.5px;font-weight:600;color:var(--tv-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Transcript</div>
+        <div style="font-size:13.5px;color:var(--tv-text);line-height:1.6;font-style:italic">"{escape(inc.get('transcript', ''))}"</div>
       </div>
     </div>
     """
@@ -231,9 +231,9 @@ def render_incidents():
         n_demo = len(incidents) - n_real
         render(f"""
         <div class="tv-card" style="padding:0">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #E2E8F0">
-            <div style="font-size:14px;font-weight:600;color:#182235">Incident queue</div>
-            <div style="font-size:12px;color:#94A3B8">{len(incidents)} {'record' if len(incidents) == 1 else 'records'}{' · ' + str(n_demo) + ' simulated' if n_demo else ''}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--tv-border)">
+            <div style="font-size:14px;font-weight:600;color:var(--tv-text)">Incident queue</div>
+            <div style="font-size:12px;color:var(--tv-dim)">{len(incidents)} {'record' if len(incidents) == 1 else 'records'}{' · ' + str(n_demo) + ' simulated' if n_demo else ''}</div>
           </div>
         """)
         
@@ -242,26 +242,26 @@ def render_incidents():
         
         # Header
         hc = st.columns([1.2, 2.2, 1.5, 1.2, 1.5, 1, 0.4], vertical_alignment="center")
-        hc[0].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Incident</span>', unsafe_allow_html=True)
-        hc[1].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Type</span>', unsafe_allow_html=True)
-        hc[2].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Speaker</span>', unsafe_allow_html=True)
-        hc[3].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Risk</span>', unsafe_allow_html=True)
-        hc[4].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Action</span>', unsafe_allow_html=True)
-        hc[5].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Timestamp</span>', unsafe_allow_html=True)
+        hc[0].markdown('<span style="font-size:12px;font-weight:600;color:var(--tv-muted);text-transform:uppercase;">Incident</span>', unsafe_allow_html=True)
+        hc[1].markdown('<span style="font-size:12px;font-weight:600;color:var(--tv-muted);text-transform:uppercase;">Type</span>', unsafe_allow_html=True)
+        hc[2].markdown('<span style="font-size:12px;font-weight:600;color:var(--tv-muted);text-transform:uppercase;">Speaker</span>', unsafe_allow_html=True)
+        hc[3].markdown('<span style="font-size:12px;font-weight:600;color:var(--tv-muted);text-transform:uppercase;">Risk</span>', unsafe_allow_html=True)
+        hc[4].markdown('<span style="font-size:12px;font-weight:600;color:var(--tv-muted);text-transform:uppercase;">Action</span>', unsafe_allow_html=True)
+        hc[5].markdown('<span style="font-size:12px;font-weight:600;color:var(--tv-muted);text-transform:uppercase;">Timestamp</span>', unsafe_allow_html=True)
         
-        st.markdown('<hr style="margin:8px 0;border-color:#E2E8F0;">', unsafe_allow_html=True)
+        st.markdown('<hr style="margin:8px 0;border-color:var(--tv-border);">', unsafe_allow_html=True)
         
         for idx, inc in enumerate(incidents):
             badge = _risk_badge(inc["risk"], inc["risk_band"])
             selected = st.session_state.incidents_selected == inc["id"]
             
             c = st.columns([1.2, 2.2, 1.5, 1.2, 1.5, 1, 0.4], vertical_alignment="center")
-            c[0].markdown(f'<span style="font-size:13.5px;font-weight:600;color:#182235">{escape(inc["id"])}</span>', unsafe_allow_html=True)
-            c[1].markdown(f'<span style="font-size:13.5px;color:#182235">{escape(inc["type"])}</span>', unsafe_allow_html=True)
-            c[2].markdown(f'<span style="font-size:13.5px;color:#182235">{escape(inc["speaker"])}</span>', unsafe_allow_html=True)
+            c[0].markdown(f'<span style="font-size:13.5px;font-weight:600;color:var(--tv-text)">{escape(inc["id"])}</span>', unsafe_allow_html=True)
+            c[1].markdown(f'<span style="font-size:13.5px;color:var(--tv-text)">{escape(inc["type"])}</span>', unsafe_allow_html=True)
+            c[2].markdown(f'<span style="font-size:13.5px;color:var(--tv-text)">{escape(inc["speaker"])}</span>', unsafe_allow_html=True)
             c[3].html(badge)
-            c[4].markdown(f'<span style="font-size:13.5px;color:#182235">{escape(inc["action"])}</span>', unsafe_allow_html=True)
-            c[5].markdown(f'<span style="font-size:13.5px;color:#94A3B8">{escape(inc["timestamp"])}</span>', unsafe_allow_html=True)
+            c[4].markdown(f'<span style="font-size:13.5px;color:var(--tv-text)">{escape(inc["action"])}</span>', unsafe_allow_html=True)
+            c[5].markdown(f'<span style="font-size:13.5px;color:var(--tv-dim)">{escape(inc["timestamp"])}</span>', unsafe_allow_html=True)
             
             # The click button
             if c[6].button("›", key=f"inc_btn_{inc['id']}", type="tertiary"):
@@ -269,7 +269,7 @@ def render_incidents():
                 st.rerun()
                 
             if idx < len(incidents) - 1:
-                st.markdown('<hr style="margin:2px 0;border-color:#E2E8F0;">', unsafe_allow_html=True)
+                st.markdown('<hr style="margin:2px 0;border-color:var(--tv-border);">', unsafe_allow_html=True)
             else:
                 st.markdown('<div style="margin-bottom:8px"></div>', unsafe_allow_html=True)
 
@@ -336,8 +336,8 @@ def render_incidents():
             render("""
             <div class="tv-card" style="text-align:center;padding:40px 20px">
               <div style="font-size:24px;margin-bottom:10px">📋</div>
-              <div style="font-size:14px;font-weight:500;color:#182235;margin-bottom:4px">Select an incident</div>
-              <div style="font-size:13px;color:#64748B">Click any row to view evidence, transcript and actions</div>
+              <div style="font-size:14px;font-weight:500;color:var(--tv-text);margin-bottom:4px">Select an incident</div>
+              <div style="font-size:13px;color:var(--tv-muted)">Click any row to view evidence, transcript and actions</div>
             </div>
             """)
 

@@ -172,7 +172,7 @@ with st.sidebar:
             if new_theme == "dark":
                 f.write('[theme]\nbase="dark"\nprimaryColor="#2563D6"\n')
             else:
-                f.write('[theme]\nbase="light"\nprimaryColor="#2563D6"\nbackgroundColor="#F7F9FC"\nsecondaryBackgroundColor="#F1F5F9"\ntextColor="#182235"\n')
+                f.write('[theme]\nbase="light"\nprimaryColor="#2563D6"\nbackgroundColor="var(--tv-bg)"\nsecondaryBackgroundColor="#F1F5F9"\ntextColor="var(--tv-text)"\n')
                 
         st.rerun()
 

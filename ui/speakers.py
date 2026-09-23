@@ -40,7 +40,9 @@ def _enrolled_badge(enrolled: bool) -> str:
 def _ts_str(ts: float | None) -> str:
     if not ts:
         return "—"
-    return time.strftime("%-d %b %Y", time.localtime(ts))
+    t = time.localtime(ts)
+    # %-d is Linux-only; strip leading zero manually for Windows compatibility
+    return time.strftime("%d %b %Y", t).lstrip("0")
 
 
 def _status_str(profile: dict) -> str:
@@ -75,30 +77,30 @@ def _render_profile_detail(profile_id: str):
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
         <div class="tv-spk-avatar" style="width:38px;height:38px;font-size:16px">👤</div>
         <div>
-          <div style="font-size:15px;font-weight:700;color:#182235">{escape(name)}</div>
-          <div style="font-size:12.5px;color:#64748B">{escape(role)}</div>
+          <div style="font-size:15px;font-weight:700;color:var(--tv-text)">{escape(name)}</div>
+          <div style="font-size:12.5px;color:var(--tv-muted)">{escape(role)}</div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div>
-          <div style="font-size:11.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Enrollment</div>
-          <div style="font-size:13.5px;font-weight:600;color:#182235">{'Enrolled' if enrolled else 'Not enrolled'}</div>
+          <div style="font-size:11.5px;color:var(--tv-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Enrollment</div>
+          <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">{'Enrolled' if enrolled else 'Not enrolled'}</div>
         </div>
         <div>
-          <div style="font-size:11.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Voice samples</div>
-          <div style="font-size:13.5px;font-weight:600;color:#182235">{sample_count} sample{'s' if sample_count != 1 else ''}</div>
+          <div style="font-size:11.5px;color:var(--tv-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Voice samples</div>
+          <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">{sample_count} sample{'s' if sample_count != 1 else ''}</div>
         </div>
         <div>
-          <div style="font-size:11.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Identity evidence</div>
-          <div style="font-size:13.5px;font-weight:600;color:#182235">{'Available' if enrolled else 'Pending'}</div>
+          <div style="font-size:11.5px;color:var(--tv-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Identity evidence</div>
+          <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">{'Available' if enrolled else 'Pending'}</div>
         </div>
         <div>
-          <div style="font-size:11.5px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Last updated</div>
-          <div style="font-size:13.5px;font-weight:600;color:#182235">{_ts_str(enrolled_at or profile.get('created_at'))}</div>
+          <div style="font-size:11.5px;color:var(--tv-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Last updated</div>
+          <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">{_ts_str(enrolled_at or profile.get('created_at'))}</div>
         </div>
       </div>
-      <div style="padding:10px;background:#F8FAFF;border-radius:6px;border:1px solid #E2E8F0;
-        font-size:12px;color:#64748B;line-height:1.55;margin-bottom:12px">
+      <div style="padding:10px;background:var(--tv-surface);border-radius:6px;border:1px solid var(--tv-border);
+        font-size:12px;color:var(--tv-muted);line-height:1.55;margin-bottom:12px">
         Similarity supports identity assessment. It does not independently prove who is speaking.
       </div>
     </div>
@@ -340,17 +342,17 @@ def render_speakers():
         render(f"""
         <div class="tv-card" style="padding:0">
           <div style="display:flex;justify-content:space-between;align-items:center;
-            padding:14px 16px;border-bottom:1px solid #E2E8F0">
-            <div style="font-size:14px;font-weight:600;color:#182235">Speaker registry</div>
-            <div style="font-size:12px;color:#94A3B8">{len(profiles)} registered</div>
+            padding:14px 16px;border-bottom:1px solid var(--tv-border)">
+            <div style="font-size:14px;font-weight:600;color:var(--tv-text)">Speaker registry</div>
+            <div style="font-size:12px;color:var(--tv-dim)">{len(profiles)} registered</div>
           </div>
         """)
 
         if not profiles:
             render("""
             <div style="padding:32px 16px;text-align:center">
-              <div style="font-size:14px;color:#64748B">No speakers registered yet.</div>
-              <div style="font-size:12.5px;color:#94A3B8;margin-top:4px">
+              <div style="font-size:14px;color:var(--tv-muted)">No speakers registered yet.</div>
+              <div style="font-size:12.5px;color:var(--tv-dim);margin-top:4px">
                 Click "+ Register speaker" to add the first voice identity.
               </div>
             </div>""")
@@ -383,11 +385,11 @@ def render_speakers():
                     <div class="tv-spk-avatar">👤</div>
                   </td>
                   <td style="font-weight:600">{escape(p['name'])}</td>
-                  <td style="color:#64748B">{escape(p.get('role') or '—')}</td>
+                  <td style="color:var(--tv-muted)">{escape(p.get('role') or '—')}</td>
                   <td>{'Enrolled' if enrolled else 'Not enrolled'}</td>
                   <td>{sample_count} sample{'s' if sample_count != 1 else ''}</td>
                   <td>{badge}</td>
-                  <td style="color:#94A3B8">{escape(ts)}</td>
+                  <td style="color:var(--tv-dim)">{escape(ts)}</td>
                 </tr>
                 """)
                 if st.button("", key=f"spk_sel_{p['id']}", help=f"View {p['name']}"):
@@ -405,10 +407,10 @@ def render_speakers():
             render("""
             <div class="tv-card" style="text-align:center;padding:40px 20px">
               <div style="font-size:24px;margin-bottom:10px">👤</div>
-              <div style="font-size:14px;font-weight:500;color:#182235;margin-bottom:4px">
+              <div style="font-size:14px;font-weight:500;color:var(--tv-text);margin-bottom:4px">
                 Select a speaker
               </div>
-              <div style="font-size:13px;color:#64748B">
+              <div style="font-size:13px;color:var(--tv-muted)">
                 Click a row to view enrollment details and manage voice samples.
               </div>
             </div>

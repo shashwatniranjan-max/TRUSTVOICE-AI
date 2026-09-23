@@ -24,7 +24,7 @@ def render_live_monitor():
         <span class="tv-badge tv-badge-demo" style="font-size:11.5px">● Prototype</span>
       </div>
     </div>
-    <p style="color:#64748B;font-size:13.5px;margin:0 0 20px 0">Visual foundation for authorized live audio-stream analysis.</p>
+    <p style="color:var(--tv-muted);font-size:13.5px;margin:0 0 20px 0">Visual foundation for authorized live audio-stream analysis.</p>
     """)
 
     col_btn, _ = st.columns([1.5, 8])
@@ -44,22 +44,22 @@ def render_live_monitor():
             <span class="tv-section-head-meta">Awaiting simulation</span>
           </div>
           
-          <div style="background:#F1F5F9;border-radius:8px;padding:24px;text-align:center;margin:12px 0 24px;color:#94A3B8;display:flex;justify-content:center;align-items:center;height:80px;font-family:monospace;font-size:24px;letter-spacing:2px;font-weight:700;color:#2563D6;opacity:0.6">
+          <div style="background:#F1F5F9;border-radius:8px;padding:24px;text-align:center;margin:12px 0 24px;color:var(--tv-dim);display:flex;justify-content:center;align-items:center;height:80px;font-family:monospace;font-size:24px;letter-spacing:2px;font-weight:700;color:#2563D6;opacity:0.6">
             ||||||||||||||||||||||||||||||||||||||||||
           </div>
           
-          <div style="display:flex;justify-content:space-between;border-top:1px solid #E2E8F0;padding-top:16px">
+          <div style="display:flex;justify-content:space-between;border-top:1px solid var(--tv-border);padding-top:16px">
             <div>
-              <div style="font-size:12px;color:#64748B;font-weight:600;margin-bottom:4px">Current speaker</div>
-              <div style="font-size:13.5px;font-weight:600;color:#182235">Not available</div>
+              <div style="font-size:12px;color:var(--tv-muted);font-weight:600;margin-bottom:4px">Current speaker</div>
+              <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">Not available</div>
             </div>
             <div>
-              <div style="font-size:12px;color:#64748B;font-weight:600;margin-bottom:4px">Voice authenticity</div>
-              <div style="font-size:13.5px;font-weight:600;color:#182235">Not available</div>
+              <div style="font-size:12px;color:var(--tv-muted);font-weight:600;margin-bottom:4px">Voice authenticity</div>
+              <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">Not available</div>
             </div>
             <div>
-              <div style="font-size:12px;color:#64748B;font-weight:600;margin-bottom:4px">Current risk</div>
-              <div style="font-size:13.5px;font-weight:600;color:#182235">Not available</div>
+              <div style="font-size:12px;color:var(--tv-muted);font-weight:600;margin-bottom:4px">Current risk</div>
+              <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">Not available</div>
             </div>
           </div>
         </div>
@@ -68,7 +68,7 @@ def render_live_monitor():
           <div class="tv-section-head">
             <span class="tv-section-head-title">Transcript stream</span>
           </div>
-          <div style="height:120px;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:13.5px">
+          <div style="height:120px;display:flex;align-items:center;justify-content:center;color:var(--tv-dim);font-size:13.5px">
             Transcript will appear when the simulation starts.
           </div>
         </div>
@@ -77,7 +77,7 @@ def render_live_monitor():
     with col2:
         render("""
         <div class="tv-card" style="padding:0">
-          <div style="padding:16px;border-bottom:1px solid #E2E8F0">
+          <div style="padding:16px;border-bottom:1px solid var(--tv-border)">
             <div class="tv-section-head-title">Current signals</div>
           </div>
           
@@ -110,10 +110,10 @@ def render_live_monitor():
             </div>
             <span class="tv-badge tv-badge-crit" style="background:#FEF2F2;color:#EF4444;border-color:#FEE2E2;font-size:11px">● Required</span>
           </div>
-          <div style="font-size:14px;font-weight:600;color:#182235;margin-bottom:8px">Trust Handshake</div>
+          <div style="font-size:14px;font-weight:600;color:var(--tv-text);margin-bottom:8px">Trust Handshake</div>
           <div style="font-size:13.5px;color:#475569;line-height:1.5">
             Independent identity verification recommended.<br><br>
-            <span style="color:#94A3B8;font-size:13px">High impersonation risk detected. Do not authenticate speaker through a separate trusted channel before proceeding.</span>
+            <span style="color:var(--tv-dim);font-size:13px">High impersonation risk detected. Do not authenticate speaker through a separate trusted channel before proceeding.</span>
           </div>
         </div>
         """)

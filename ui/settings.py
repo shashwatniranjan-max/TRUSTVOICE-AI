@@ -42,29 +42,29 @@ def render_settings():
           <div class="tv-card-title">Analysis services</div>
           <div class="tv-evidence-row">
             <div>
-              <div style="font-size:13.5px;font-weight:600;color:#182235">Audio preprocessing</div>
-              <div style="font-size:12px;color:#94A3B8">Managed by the existing analysis pipeline</div>
+              <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">Audio preprocessing</div>
+              <div style="font-size:12px;color:var(--tv-dim)">Managed by the existing analysis pipeline</div>
             </div>
             <span class="tv-badge tv-badge-ok">● Ready</span>
           </div>
           <div class="tv-evidence-row">
             <div>
-              <div style="font-size:13.5px;font-weight:600;color:#182235">Voice authenticity</div>
-              <div style="font-size:12px;color:#94A3B8">Managed by the existing analysis pipeline</div>
+              <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">Voice authenticity</div>
+              <div style="font-size:12px;color:var(--tv-dim)">Managed by the existing analysis pipeline</div>
             </div>
             <span class="tv-badge tv-badge-ok">● Ready</span>
           </div>
           <div class="tv-evidence-row">
             <div>
-              <div style="font-size:13.5px;font-weight:600;color:#182235">Speech-to-text</div>
-              <div style="font-size:12px;color:#94A3B8">Managed by the existing analysis pipeline</div>
+              <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">Speech-to-text</div>
+              <div style="font-size:12px;color:var(--tv-dim)">Managed by the existing analysis pipeline</div>
             </div>
             {asr_status_badge}
           </div>
           <div class="tv-evidence-row" style="border-bottom:0">
             <div>
-              <div style="font-size:13.5px;font-weight:600;color:#182235">Risk fusion</div>
-              <div style="font-size:12px;color:#94A3B8">Managed by the existing analysis pipeline</div>
+              <div style="font-size:13.5px;font-weight:600;color:var(--tv-text)">Risk fusion</div>
+              <div style="font-size:12px;color:var(--tv-dim)">Managed by the existing analysis pipeline</div>
             </div>
             <span class="tv-badge tv-badge-warn">● Prototype</span>
           </div>
@@ -97,7 +97,7 @@ def render_settings():
           <div class="tv-card-title">Speech recognition</div>
           <div class="tv-evidence-row">
             <span class="tv-evidence-label">ASR model</span>
-            <span style="font-size:13px;font-weight:500;color:#182235">{escape(asr_model_name())}</span>
+            <span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(asr_model_name())}</span>
           </div>
           <div class="tv-evidence-row" style="border-bottom:0">
             <span class="tv-evidence-label">Status</span>
@@ -136,11 +136,11 @@ def render_settings():
         render(f"""
         <div class="tv-evidence-row" style="margin-top:6px">
           <span class="tv-evidence-label">Current threshold</span>
-          <span style="font-size:13px;font-weight:500;color:#182235">{current_thresh:.3f}</span>
+          <span style="font-size:13px;font-weight:500;color:var(--tv-text)">{current_thresh:.3f}</span>
         </div>
         <div class="tv-evidence-row">
           <span class="tv-evidence-label">Source</span>
-          <span style="font-size:13px;color:#182235">{escape(str(st.session_state.threshold_source))}</span>
+          <span style="font-size:13px;color:var(--tv-text)">{escape(str(st.session_state.threshold_source))}</span>
         </div>
         """)
 
