@@ -5,6 +5,7 @@ from __future__ import annotations
 from html import escape
 
 import streamlit as st
+import streamlit.components.v1 as _stc
 
 from ui.theme import COLORS, status_color
 
@@ -14,6 +15,43 @@ def render(html: str):
         st.html(html)
     else:
         st.markdown(html, unsafe_allow_html=True)
+
+
+def _render_progression_card(stages_risk: list[int], label: str):
+    """Render the analysis progression card using components.v1.html so the
+    SVG is guaranteed to display regardless of Streamlit version."""
+    svg = _progression_svg(stages_risk)
+    # Wrap in a styled container so fonts/colours match the rest of the page
+    html_blob = f"""
+    <!doctype html>
+    <html>
+    <head>
+    <style>
+      body {{margin:0;padding:0;background:#fff;font-family:'Inter','Segoe UI',system-ui,sans-serif;}}
+      .wrap {{padding:0;}}
+      .head {{display:flex;justify-content:space-between;align-items:center;
+              margin-bottom:10px;}}
+      .title {{font-size:14px;font-weight:600;color:#182235;}}
+      .meta  {{font-size:12px;color:#94A3B8;}}
+    </style>
+    </head>
+    <body>
+    <div class="wrap">
+      <div class="head">
+        <span class="title">Analysis progression</span>
+        <span class="meta">{label}</span>
+      </div>
+      {svg}
+    </div>
+    </body>
+    </html>
+    """
+    # Height: 14px head + 10px gap + 140px svg + 4px pad ≈ 168px; card border
+    # is rendered by the outer Streamlit container via CSS, so we wrap in a
+    # tv-card div here too so the border + padding are consistent.
+    render("""<div class="tv-card" style="padding:14px 16px 10px">""")
+    _stc.html(html_blob, height=160, scrolling=False)
+    render("""</div>""")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -356,7 +394,6 @@ def render_overview():
         # Compute progression data
         if result:
             fd = result.get("factor_display") or {}
-            # Convert safety scores → risk scores for chart
             stages_risk = [
                 max(5, min(95, 100 - (fd.get("Voice Authenticity") or 50))),
                 max(5, min(95, 100 - (fd.get("Voice Authenticity") or 50))),
@@ -368,16 +405,10 @@ def render_overview():
         else:
             stages_risk = [32, 38, 42, 55, 72, 92]
 
-        svg = _progression_svg(stages_risk)
-        render(f"""
-        <div class="tv-card">
-          <div class="tv-section-head">
-            <span class="tv-section-head-title">Analysis progression</span>
-            <span class="tv-section-head-meta">{'Simulated demonstration' if is_demo else 'Current evaluation'}</span>
-          </div>
-          <div style="padding:4px 0 8px">{svg}</div>
-        </div>
-        """)
+        prog_label = "Simulated demonstration" if is_demo else "Current evaluation"
+        _render_progression_card(stages_risk, prog_label)
+
+
 
     with col_chain:
         chain_rows = _reasoning_chain_html(result)

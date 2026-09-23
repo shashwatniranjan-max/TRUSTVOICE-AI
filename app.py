@@ -28,22 +28,22 @@ NEUTRAL_FACTORS = {
     "Context Safety": 93,
 }
 
-# Navigation: (group_label, [(store_name, button_key, display_label)])
+# Navigation: (group_label, [(store_name, button_key, display_label, icon)])
 NAV_GROUPS = (
     (
         "SECURITY OPERATIONS",
         (
-            ("Overview", "nav_Overview", "Overview"),
-            ("Analyze Audio", "nav_Analyze", "Analyze Audio"),
-            ("Live Monitor", "nav_Live", "Live Monitor"),
-            ("Trusted Speakers", "nav_Speakers", "Trusted Speakers"),
-            ("Incidents", "nav_Incidents", "Incidents"),
+            ("Overview", "nav_Overview", "Overview", ":material/grid_view:"),
+            ("Analyze Audio", "nav_Analyze", "Analyze Audio", ":material/graphic_eq:"),
+            ("Live Monitor", "nav_Live", "Live Monitor", ":material/sensors:"),
+            ("Trusted Speakers", "nav_Speakers", "Trusted Speakers", ":material/person:"),
+            ("Incidents", "nav_Incidents", "Incidents", ":material/receipt_long:"),
         ),
     ),
     (
         "SYSTEM",
         (
-            ("Settings", "nav_Settings", "Settings"),
+            ("Settings", "nav_Settings", "Settings", ":material/settings:"),
         ),
     ),
 )
@@ -119,30 +119,33 @@ _render_html(css())
 
 # ── Sidebar ─────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Brand logo
-    _render_html("""
+    # Brand logo using Base64 SVG (requires xmlns to render in an img tag)
+    import base64
+    raw_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>'
+    b64_svg = base64.b64encode(raw_svg.encode('utf-8')).decode('utf-8')
+    svg_data = f"data:image/svg+xml;base64,{b64_svg}"
+    
+    st.markdown(f"""
     <div class="tv-brand">
       <div class="tv-mark">
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>
+        <img src="{svg_data}" alt="Logo" width="20" height="20" style="display:block">
       </div>
       <div>
         <div class="tv-brand-name">TRUSTVOICE</div>
         <div class="tv-brand-sub">AI Security</div>
       </div>
     </div>
-    """)
+    """, unsafe_allow_html=True)
 
     current = st.session_state.ui_nav
     for group_label, items in NAV_GROUPS:
         _render_html(f'<div class="tv-nav-section">{group_label}</div>')
-        for store, key, label in items:
+        for store, key, label, icon in items:
             active = current == store
             if st.button(
                 label,
                 key=key,
+                icon=icon,
                 use_container_width=True,
                 type="primary" if active else "secondary",
             ):

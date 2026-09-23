@@ -79,11 +79,11 @@ html, body, [data-testid="stApp"], [data-testid="stAppViewContainer"] {{
 /* Main block container */
 .block-container {{
   max-width: none !important;
-  padding: 1.5rem 2rem 2rem !important;
+  padding: 2rem 3rem 2rem !important;
   margin: 0 !important;
 }}
 [data-testid="stMainBlockContainer"] {{
-  padding: 1.5rem 2rem 2rem !important;
+  padding: 2rem 3rem 2rem !important;
 }}
 
 /* ── Sidebar ──────────────────────────────────────────────────────────────── */
@@ -93,32 +93,37 @@ html, body, [data-testid="stApp"], [data-testid="stAppViewContainer"] {{
   box-shadow: none !important;
 }}
 section[data-testid="stSidebar"] {{
-  min-width: 240px !important;
-  max-width: 240px !important;
+  min-width: 260px !important;
+  max-width: 260px !important;
 }}
 [data-testid="stSidebar"] > div,
-[data-testid="stSidebarContent"] {{
-  padding: 0 !important;
+[data-testid="stSidebarContent"],
+[data-testid="stSidebarUserContent"] {{
+  padding-top: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
   background: {c['sidebar']} !important;
 }}
 
 /* Sidebar button resets */
 [data-testid="stSidebar"] .stButton {{
-  margin: 1px 0 !important;
-  padding: 0 8px !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }}
 [data-testid="stSidebar"] .stButton > button {{
   background: transparent !important;
   border: none !important;
-  border-radius: 6px !important;
-  color: {c['muted']} !important;
-  font-size: 13.5px !important;
+  border-left: 3px solid transparent !important;
+  border-radius: 0 !important;
+  color: {c['text']} !important;
+  font-size: 15px !important;
   font-weight: 500 !important;
   text-align: left !important;
   justify-content: flex-start !important;
-  padding: 7px 10px !important;
-  min-height: 34px !important;
+  padding: 10px 24px 10px 21px !important;
+  min-height: 44px !important;
   width: 100% !important;
+  margin: 0 !important;
   box-shadow: none !important;
   transition: background 0.12s, color 0.12s !important;
 }}
@@ -126,6 +131,7 @@ section[data-testid="stSidebar"] {{
   background: {c['bg2']} !important;
   color: {c['text']} !important;
   border: none !important;
+  border-left: 3px solid transparent !important;
   box-shadow: none !important;
 }}
 
@@ -135,13 +141,23 @@ section[data-testid="stSidebar"] {{
   background: {c['accent_light']} !important;
   color: {c['accent']} !important;
   font-weight: 600 !important;
-  box-shadow: inset 3px 0 0 {c['accent']} !important;
+  box-shadow: none !important;
   border: none !important;
-  border-radius: 0 6px 6px 0 !important;
+  border-left: 3px solid {c['accent']} !important;
+  border-radius: 0 !important;
+}}
+[data-testid="stSidebar"] button[kind="primary"] p::after,
+[data-testid="stSidebar"] button[data-testid="baseButton-primary"] p::after {{
+  content: '›';
+  position: absolute;
+  right: 20px;
+  font-size: 18px;
+  font-weight: 500;
 }}
 [data-testid="stSidebar"] button[kind="primary"]:hover,
 [data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover {{
   background: {c['accent2']} !important;
+  border-left: 3px solid {c['accent']} !important;
 }}
 
 /* ── Main area buttons ────────────────────────────────────────────────────── */
@@ -280,7 +296,7 @@ div[data-testid="stAlert"] {{
 [data-testid="stDataFrame"],
 .stDataFrame {{
   background: {c['surface']} !important;
-  border: 1px solid {c['border']} !important;
+  border: none !important;
   border-radius: 8px !important;
   overflow: hidden !important;
 }}
@@ -374,28 +390,31 @@ div[data-testid="stAlert"] {{
 
 /* Sidebar nav section label */
 .tv-nav-section {{
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.10em;
-  color: {c['dim']};
-  padding: 12px 16px 4px;
-  margin-top: 4px;
+  letter-spacing: 0.08em;
+  color: {c['muted']};
+  padding: 20px 24px 10px;
+  margin-top: 12px;
 }}
 
 /* Sidebar logo */
 .tv-brand {{
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 16px 16px 14px;
+  gap: 12px;
+  padding: 24px 20px 16px;
+  margin-top: -42px; /* Aggressively pull up over Streamlit markdown padding */
+  margin-left: -20px;
+  margin-right: -20px;
   border-bottom: 1px solid {c['border']};
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }}
 .tv-mark {{
-  width: 32px;
-  height: 32px;
-  border-radius: 7px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   background: {c['accent']};
   display: flex;
   align-items: center;
@@ -403,13 +422,13 @@ div[data-testid="stAlert"] {{
   flex-shrink: 0;
 }}
 .tv-mark svg {{ color: white; }}
-.tv-brand-name {{ font-size: 14px; font-weight: 700; color: {c['text']}; line-height: 1.1; }}
-.tv-brand-sub {{ font-size: 10.5px; color: {c['muted']}; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }}
+.tv-brand-name {{ font-size: 15px; font-weight: 700; color: {c['text']}; line-height: 1.1; }}
+.tv-brand-sub {{ font-size: 11px; color: {c['muted']}; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; margin-top: 2px; }}
 
 /* Sidebar footer */
 .tv-side-foot {{
-  margin: 12px 8px;
-  padding: 10px 12px;
+  margin: 24px 16px 16px;
+  padding: 12px 14px;
   background: {c['bg']};
   border: 1px solid {c['border']};
   border-radius: 8px;
@@ -798,9 +817,17 @@ div[data-testid="stAlert"] {{
     max-width: 200px !important;
   }}
 }}
-@media print {{
-  [data-testid="stSidebar"] {{ display: none !important; }}
-  .tv-page, .stButton {{ display: none !important; }}
+/* Streamlit overrides */
+header[data-testid="stHeader"],
+.stDeployButton,
+[data-testid="stToolbar"] {{
+  display: none !important;
+}}
+#MainMenu {{
+  visibility: hidden !important;
+}}
+footer {{
+  visibility: hidden !important;
 }}
 </style>
 """

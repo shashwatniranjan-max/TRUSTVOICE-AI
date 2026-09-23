@@ -18,87 +18,102 @@ def render(html: str):
 
 def render_live_monitor():
     render("""
-    <div class="tv-page">
-      <div>
-        <h1>LIVE MONITOR</h1>
-        <p>Real-time voice security monitoring — prototype status.</p>
+    <div class="tv-page" style="align-items:center;border-bottom:0;padding-bottom:0">
+      <div style="display:flex;align-items:center;gap:12px">
+        <h1 style="margin:0">LIVE MONITOR</h1>
+        <span class="tv-badge tv-badge-demo" style="font-size:11.5px">● Prototype</span>
       </div>
     </div>
+    <p style="color:#64748B;font-size:13.5px;margin:0 0 20px 0">Visual foundation for authorized live audio-stream analysis.</p>
     """)
 
-    col1, col2 = st.columns([1.4, 1], gap="medium")
+    col_btn, _ = st.columns([1.5, 8])
+    with col_btn:
+        if st.button("Start simulation", icon=":material/play_arrow:", type="primary", use_container_width=True):
+            st.info("Simulation not active in this demo version.")
+
+    st.warning("This prototype represents controlled live audio simulation. It does not intercept ordinary cellular calls or connect to cellular networks.", icon="⚠️")
+
+    col1, col2 = st.columns([1.8, 1], gap="medium")
 
     with col1:
         render("""
         <div class="tv-card">
-          <div class="tv-card-title">Monitor status</div>
-          <div class="tv-evidence-row">
-            <span class="tv-evidence-label">Live call interception</span>
-            <span class="tv-badge tv-badge-gray">Not implemented</span>
+          <div class="tv-section-head">
+            <span class="tv-section-head-title">Live audio</span>
+            <span class="tv-section-head-meta">Awaiting simulation</span>
           </div>
-          <div class="tv-evidence-row">
-            <span class="tv-evidence-label">Analysis engine</span>
-            <span class="tv-badge tv-badge-ok">● Ready</span>
+          
+          <div style="background:#F1F5F9;border-radius:8px;padding:24px;text-align:center;margin:12px 0 24px;color:#94A3B8;display:flex;justify-content:center;align-items:center;height:80px;font-family:monospace;font-size:24px;letter-spacing:2px;font-weight:700;color:#2563D6;opacity:0.6">
+            ||||||||||||||||||||||||||||||||||||||||||
           </div>
-          <div class="tv-evidence-row" style="border-bottom:0">
-            <span class="tv-evidence-label">Prototype mode</span>
-            <span style="font-size:13px;color:#182235;font-weight:500">Upload / manual analysis</span>
+          
+          <div style="display:flex;justify-content:space-between;border-top:1px solid #E2E8F0;padding-top:16px">
+            <div>
+              <div style="font-size:12px;color:#64748B;font-weight:600;margin-bottom:4px">Current speaker</div>
+              <div style="font-size:13.5px;font-weight:600;color:#182235">Not available</div>
+            </div>
+            <div>
+              <div style="font-size:12px;color:#64748B;font-weight:600;margin-bottom:4px">Voice authenticity</div>
+              <div style="font-size:13.5px;font-weight:600;color:#182235">Not available</div>
+            </div>
+            <div>
+              <div style="font-size:12px;color:#64748B;font-weight:600;margin-bottom:4px">Current risk</div>
+              <div style="font-size:13.5px;font-weight:600;color:#182235">Not available</div>
+            </div>
           </div>
         </div>
 
-        <div class="tv-card" style="margin-top:0">
-          <div class="tv-card-title">About live monitoring</div>
-          <div class="tv-muted" style="line-height:1.65">
-            TRUSTVOICE does not intercept ordinary cellular calls. This prototype
-            analyses audio files and manual transcripts submitted through the
-            Analyze Audio page. A live monitoring integration would require explicit
-            integration with a telephony provider and is outside the current scope.
+        <div class="tv-card">
+          <div class="tv-section-head">
+            <span class="tv-section-head-title">Transcript stream</span>
+          </div>
+          <div style="height:120px;display:flex;align-items:center;justify-content:center;color:#94A3B8;font-size:13.5px">
+            Transcript will appear when the simulation starts.
           </div>
         </div>
         """)
 
-        # Last analysis quick summary
-        result = st.session_state.get("last_result")
-        if result:
-            trust = int(result.get("trust_score", 50))
-            imp_risk = max(0, min(100, 100 - trust))
-            band = result.get("interaction_risk", "LOW")
-            badge_cls = "tv-badge-crit" if imp_risk >= 80 else ("tv-badge-warn" if imp_risk >= 55 else "tv-badge-ok")
-            render(f"""
-            <div class="tv-card" style="border-left:3px solid #2563D6">
-              <div class="tv-card-title">Last analysis</div>
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                <span style="font-size:28px;font-weight:700;color:#182235">{imp_risk}</span>
-                <span style="font-size:15px;color:#64748B">/ 100</span>
-                <span class="tv-badge {badge_cls}">{escape(band.replace('_', ' ').title())}</span>
-              </div>
-              <div class="tv-note">{escape(str(result.get('action_detail') or result.get('action') or ''))}</div>
-            </div>
-            """)
-
     with col2:
         render("""
+        <div class="tv-card" style="padding:0">
+          <div style="padding:16px;border-bottom:1px solid #E2E8F0">
+            <div class="tv-section-head-title">Current signals</div>
+          </div>
+          
+          <div class="tv-evidence-row" style="padding:12px 16px">
+            <span class="tv-evidence-label">Voice authenticity</span>
+            <span class="tv-badge tv-badge-gray" style="font-size:11px">● Unavailable</span>
+          </div>
+          <div class="tv-evidence-row" style="padding:12px 16px">
+            <span class="tv-evidence-label">Speaker identity</span>
+            <span class="tv-badge tv-badge-gray" style="font-size:11px">● Unavailable</span>
+          </div>
+          <div class="tv-evidence-row" style="padding:12px 16px">
+            <span class="tv-evidence-label">Intent</span>
+            <span class="tv-badge tv-badge-gray" style="font-size:11px">● Unavailable</span>
+          </div>
+          <div class="tv-evidence-row" style="padding:12px 16px">
+            <span class="tv-evidence-label">Behaviour</span>
+            <span class="tv-badge tv-badge-gray" style="font-size:11px">● Unavailable</span>
+          </div>
+          <div class="tv-evidence-row" style="padding:12px 16px;border-bottom:0">
+            <span class="tv-evidence-label">Context</span>
+            <span class="tv-badge tv-badge-gray" style="font-size:11px">● Unavailable</span>
+          </div>
+        </div>
+        
         <div class="tv-card">
-          <div class="tv-card-title">Analysis methods</div>
-          <div class="tv-pipeline-item">
-            <div class="tv-pipeline-num done">✓</div>
-            <div class="tv-pipeline-label">File upload analysis</div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+            <div style="width:36px;height:36px;background:#EFF6FF;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#2563D6">
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+            </div>
+            <span class="tv-badge tv-badge-crit" style="background:#FEF2F2;color:#EF4444;border-color:#FEE2E2;font-size:11px">● Required</span>
           </div>
-          <div class="tv-pipeline-item">
-            <div class="tv-pipeline-num done">✓</div>
-            <div class="tv-pipeline-label">Microphone recording</div>
-          </div>
-          <div class="tv-pipeline-item">
-            <div class="tv-pipeline-num done">✓</div>
-            <div class="tv-pipeline-label">Manual transcript</div>
-          </div>
-          <div class="tv-pipeline-item">
-            <div class="tv-pipeline-num">—</div>
-            <div class="tv-pipeline-label" style="color:#94A3B8">Live call integration</div>
-          </div>
-          <div class="tv-pipeline-item" style="border-bottom:0">
-            <div class="tv-pipeline-num">—</div>
-            <div class="tv-pipeline-label" style="color:#94A3B8">Real-time stream</div>
+          <div style="font-size:14px;font-weight:600;color:#182235;margin-bottom:8px">Trust Handshake</div>
+          <div style="font-size:13.5px;color:#475569;line-height:1.5">
+            Independent identity verification recommended.<br><br>
+            <span style="color:#94A3B8;font-size:13px">High impersonation risk detected. Do not authenticate speaker through a separate trusted channel before proceeding.</span>
           </div>
         </div>
         """)

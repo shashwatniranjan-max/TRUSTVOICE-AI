@@ -207,6 +207,10 @@ def render_incidents():
     # Init selected incident
     if "incidents_selected" not in st.session_state:
         st.session_state.incidents_selected = None
+        
+    if "incident" in st.query_params:
+        st.session_state.incidents_selected = st.query_params["incident"]
+        st.query_params.clear()
 
     incidents = _get_incidents()
     search = st.text_input("Search incidents", placeholder="Search incidents…",
@@ -231,39 +235,45 @@ def render_incidents():
             <div style="font-size:14px;font-weight:600;color:#182235">Incident queue</div>
             <div style="font-size:12px;color:#94A3B8">{len(incidents)} {'record' if len(incidents) == 1 else 'records'}{' · ' + str(n_demo) + ' simulated' if n_demo else ''}</div>
           </div>
-          <table class="tv-table">
-            <tr>
-              <th>Incident</th>
-              <th>Type</th>
-              <th>Speaker</th>
-              <th>Risk</th>
-              <th>Action</th>
-              <th>Timestamp</th>
-              <th></th>
-            </tr>
         """)
-
-        for inc in incidents:
+        
+        # Native column layout imitating a clean HTML table
+        st.markdown('<div style="padding:0 16px;">', unsafe_allow_html=True)
+        
+        # Header
+        hc = st.columns([1.2, 2.2, 1.5, 1.2, 1.5, 1, 0.4], vertical_alignment="center")
+        hc[0].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Incident</span>', unsafe_allow_html=True)
+        hc[1].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Type</span>', unsafe_allow_html=True)
+        hc[2].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Speaker</span>', unsafe_allow_html=True)
+        hc[3].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Risk</span>', unsafe_allow_html=True)
+        hc[4].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Action</span>', unsafe_allow_html=True)
+        hc[5].markdown('<span style="font-size:12px;font-weight:600;color:#64748B;text-transform:uppercase;">Timestamp</span>', unsafe_allow_html=True)
+        
+        st.markdown('<hr style="margin:8px 0;border-color:#E2E8F0;">', unsafe_allow_html=True)
+        
+        for idx, inc in enumerate(incidents):
             badge = _risk_badge(inc["risk"], inc["risk_band"])
             selected = st.session_state.incidents_selected == inc["id"]
-            row_style = f"background:{'#EFF6FF' if selected else 'transparent'}"
-            render(f"""
-            <tr style="{row_style}">
-              <td style="font-weight:600">{escape(inc['id'])}</td>
-              <td>{escape(inc['type'])}</td>
-              <td>{escape(inc['speaker'])}</td>
-              <td>{badge}</td>
-              <td>{escape(inc['action'])}</td>
-              <td style="color:#94A3B8">{escape(inc['timestamp'])}</td>
-              <td class="tv-arrow">›</td>
-            </tr>
-            """)
-            # Hidden button for selection
-            if st.button("", key=f"inc_sel_{inc['id']}", help=f"Open {inc['id']}"):
+            
+            c = st.columns([1.2, 2.2, 1.5, 1.2, 1.5, 1, 0.4], vertical_alignment="center")
+            c[0].markdown(f'<span style="font-size:13.5px;font-weight:600;color:#182235">{escape(inc["id"])}</span>', unsafe_allow_html=True)
+            c[1].markdown(f'<span style="font-size:13.5px;color:#182235">{escape(inc["type"])}</span>', unsafe_allow_html=True)
+            c[2].markdown(f'<span style="font-size:13.5px;color:#182235">{escape(inc["speaker"])}</span>', unsafe_allow_html=True)
+            c[3].html(badge)
+            c[4].markdown(f'<span style="font-size:13.5px;color:#182235">{escape(inc["action"])}</span>', unsafe_allow_html=True)
+            c[5].markdown(f'<span style="font-size:13.5px;color:#94A3B8">{escape(inc["timestamp"])}</span>', unsafe_allow_html=True)
+            
+            # The click button
+            if c[6].button("›", key=f"inc_btn_{inc['id']}", type="tertiary"):
                 st.session_state.incidents_selected = inc["id"]
                 st.rerun()
+                
+            if idx < len(incidents) - 1:
+                st.markdown('<hr style="margin:2px 0;border-color:#E2E8F0;">', unsafe_allow_html=True)
+            else:
+                st.markdown('<div style="margin-bottom:8px"></div>', unsafe_allow_html=True)
 
-        render("""</table></div>""")
+        st.markdown('</div></div>', unsafe_allow_html=True)
 
     with col_detail:
         sel_id = st.session_state.incidents_selected
@@ -275,28 +285,53 @@ def render_incidents():
                     st.session_state.incidents_selected = None
                     st.rerun()
 
-                # Export for live incident
-                if sel_inc.get("_live") and st.session_state.get("last_result"):
-                    with st.expander("Export incident report"):
-                        if st.button("Generate PDF report", use_container_width=True, key="inc_gen_pdf"):
-                            try:
+                # Export functionality (preserved from old Reports)
+                with st.expander("Export incident report"):
+                    if st.button("Generate PDF report", use_container_width=True, key="inc_gen_pdf"):
+                        try:
+                            if sel_inc.get("_live") and st.session_state.get("last_result"):
                                 rep = build_incident_report(st.session_state)
-                                st.session_state.incident_report = rep
-                                if REPORTLAB_AVAILABLE:
-                                    st.session_state.incident_report_pdf = build_incident_report_pdf(rep)
-                                    st.session_state.incident_report_filename = f"{rep.get('report_id', 'incident')}.pdf"
-                                    st.success("Report generated.")
-                            except Exception as exc:
-                                st.error(str(exc))
-                        if st.session_state.get("incident_report_pdf"):
-                            st.download_button(
-                                "Download PDF",
-                                st.session_state.incident_report_pdf,
-                                st.session_state.get("incident_report_filename", "incident.pdf"),
-                                "application/pdf",
-                                use_container_width=True,
-                                key="inc_dl_pdf",
-                            )
+                            else:
+                                # Mock report structure for demo incidents so export doesn't break
+                                rep = {
+                                    "report_id": sel_inc["id"],
+                                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                                    "scenario": sel_inc["type"],
+                                    "interaction_risk": sel_inc["risk_band"],
+                                    "trust_score": sel_inc["risk"],
+                                    "recommended_action": sel_inc["action"],
+                                    "voice_authenticity": "Suspicious",
+                                    "identity_status": "Mismatch",
+                                    "prototype_note": "Demo record export."
+                                }
+
+                            st.session_state.incident_report = rep
+                            if REPORTLAB_AVAILABLE:
+                                st.session_state.incident_report_pdf = build_incident_report_pdf(rep)
+                                st.session_state.incident_report_filename = f"{rep.get('report_id', 'incident')}.pdf"
+                                st.success("Report generated.")
+                            else:
+                                st.error("PDF generator unavailable (reportlab not installed).")
+                        except Exception as exc:
+                            st.error(str(exc))
+
+                    if st.session_state.get("incident_report_pdf"):
+                        st.download_button(
+                            label="Download PDF",
+                            data=st.session_state.incident_report_pdf,
+                            file_name=st.session_state.incident_report_filename,
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key="inc_dl_pdf",
+                        )
+                        st.download_button(
+                            label="Download JSON",
+                            data=json.dumps(st.session_state.incident_report, indent=2),
+                            file_name=st.session_state.incident_report_filename.replace(".pdf", ".json"),
+                            mime="application/json",
+                            use_container_width=True,
+                            key="inc_dl_json",
+                        )
         else:
             render("""
             <div class="tv-card" style="text-align:center;padding:40px 20px">
