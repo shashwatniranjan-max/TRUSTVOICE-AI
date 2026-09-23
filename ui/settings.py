@@ -1,77 +1,191 @@
-"""Countermeasure and threshold controls."""
+"""Settings — system status and prototype analysis preferences."""
+
+from __future__ import annotations
+
+from html import escape
 
 import streamlit as st
 
-from models.antispoof import MODEL_DIR, MODEL_REGISTRY
-from models.asr import asr_model_name
-from ui.components import render
-from ui.console import render_topbar
+from models.antispoof import MODEL_REGISTRY
+from models.asr import asr_dependency_status, asr_model_name
+from risk.config import DEFAULT_BONA_THRESHOLD, DEFAULT_DECISION_BAND
+from ui.theme import COLORS
+
+
+def render(html: str):
+    if hasattr(st, "html"):
+        st.html(html)
+    else:
+        st.markdown(html, unsafe_allow_html=True)
 
 
 def render_settings():
-    render_topbar("Settings")
-    render(st, '<div class="tv-card-title">Analysis</div>')
-    st.caption(
-        "The default 0.50 threshold is a prototype starting point, not a calibrated probability. "
-        "Use the evaluation lab when you have labelled REAL_ and SPOOF_ files."
-    )
-
-    keys = list(MODEL_REGISTRY.keys())
-    chosen = st.selectbox(
-        "Active anti-spoof model",
-        keys,
-        index=keys.index(st.session_state.model_choice),
-        format_func=lambda k: f"{MODEL_REGISTRY[k]['label']} · {MODEL_REGISTRY[k]['approx_size']}",
-    )
-    if chosen != st.session_state.model_choice:
-        st.session_state.model_choice = chosen
-        st.session_state.last_analysis = None
-        st.warning(
-            f"Switched to {MODEL_REGISTRY[chosen]['label']}. Previous audio results were cleared "
-            "because scores from different checkpoints are not comparable."
-        )
-
-    t1, t2 = st.columns(2)
-    with t1:
-        new_threshold = st.slider(
-            "Authenticity threshold", 0.05, 0.95,
-            float(st.session_state.bona_threshold), 0.01,
-        )
-    with t2:
-        new_band = st.slider(
-            "Uncertainty band", 0.0, 0.40,
-            float(st.session_state.decision_band), 0.01,
-        )
-    if new_threshold != st.session_state.bona_threshold:
-        st.session_state.bona_threshold = float(new_threshold)
-        st.session_state.threshold_source = "manual override"
-    if new_band != st.session_state.decision_band:
-        st.session_state.decision_band = float(new_band)
-
-    src = st.session_state.threshold_source
-    if src.startswith("default"):
-        st.info("Threshold not calibrated — using prototype default.")
-
-    render(st, '<div class="tv-card-title" style="margin-top:16px">Audio / ASR</div>')
-    render(st, f"""
-    <div class="tv-card">
-      <table class="tv-table">
-        <tr><td>Model</td><td>{MODEL_REGISTRY[st.session_state.model_choice]['label']}</td></tr>
-        <tr><td>Threshold</td><td class="num">{st.session_state.bona_threshold:.3f}</td></tr>
-        <tr><td>Decision band</td><td class="num">±{st.session_state.decision_band:.3f}</td></tr>
-        <tr><td>Threshold source</td><td>{src}</td></tr>
-        <tr><td>ASR model</td><td>{asr_model_name()} (TRUSTVOICE_ASR_MODEL)</td></tr>
-        <tr><td>Model directory</td><td>{MODEL_DIR}</td></tr>
-        <tr><td>Execution</td><td>CPU · 1 thread · sequential</td></tr>
-      </table>
+    render("""
+    <div class="tv-page">
+      <div>
+        <h1>SETTINGS</h1>
+        <p>System status and prototype analysis preferences.</p>
+      </div>
     </div>
     """)
-    st.caption(MODEL_REGISTRY[st.session_state.model_choice]["note"])
-    render(st, '<div class="tv-card-title" style="margin-top:16px">Prototype information</div>')
-    st.caption(
-        "Prototype processing is local to the application environment. Voice/audio data should "
-        "be treated as sensitive and retained only as long as necessary. Set TRUSTVOICE_MODEL_PATH "
-        "to run fully offline. Set TRUSTVOICE_ASR_MODEL (default tiny) for local Whisper ASR. "
-        "This prototype does not intercept ordinary cellular calls and does "
-        "not enroll a production speaker gallery."
-    )
+
+    dep = asr_dependency_status()
+    asr_ready = dep.get("ok", False)
+    asr_status_badge = '<span class="tv-badge tv-badge-ok">● Ready</span>' if asr_ready else \
+                       '<span class="tv-badge tv-badge-warn">● Unavailable</span>'
+
+    col_services, col_policy = st.columns([1, 1], gap="medium")
+
+    with col_services:
+        render(f"""
+        <div class="tv-card">
+          <div class="tv-card-title">Analysis services</div>
+          <div class="tv-evidence-row">
+            <div>
+              <div style="font-size:13.5px;font-weight:600;color:#182235">Audio preprocessing</div>
+              <div style="font-size:12px;color:#94A3B8">Managed by the existing analysis pipeline</div>
+            </div>
+            <span class="tv-badge tv-badge-ok">● Ready</span>
+          </div>
+          <div class="tv-evidence-row">
+            <div>
+              <div style="font-size:13.5px;font-weight:600;color:#182235">Voice authenticity</div>
+              <div style="font-size:12px;color:#94A3B8">Managed by the existing analysis pipeline</div>
+            </div>
+            <span class="tv-badge tv-badge-ok">● Ready</span>
+          </div>
+          <div class="tv-evidence-row">
+            <div>
+              <div style="font-size:13.5px;font-weight:600;color:#182235">Speech-to-text</div>
+              <div style="font-size:12px;color:#94A3B8">Managed by the existing analysis pipeline</div>
+            </div>
+            {asr_status_badge}
+          </div>
+          <div class="tv-evidence-row" style="border-bottom:0">
+            <div>
+              <div style="font-size:13.5px;font-weight:600;color:#182235">Risk fusion</div>
+              <div style="font-size:12px;color:#94A3B8">Managed by the existing analysis pipeline</div>
+            </div>
+            <span class="tv-badge tv-badge-warn">● Prototype</span>
+          </div>
+        </div>
+        """)
+
+        if not asr_ready:
+            st.info(dep.get("error") or "ASR unavailable — faster-whisper may not be installed.")
+
+        # Model selection
+        render("""<div class="tv-card" style="margin-top:0">
+          <div class="tv-card-title">Anti-spoofing model</div>
+        </div>""")
+        model_key = st.selectbox(
+            "Model",
+            list(MODEL_REGISTRY.keys()),
+            index=list(MODEL_REGISTRY.keys()).index(st.session_state.model_choice)
+            if st.session_state.model_choice in MODEL_REGISTRY else 0,
+            format_func=lambda k: MODEL_REGISTRY[k]["label"],
+            key="settings_model",
+            label_visibility="collapsed",
+        )
+        if model_key != st.session_state.model_choice:
+            st.session_state.model_choice = model_key
+            st.success("Model updated.")
+
+        # ASR model info
+        render(f"""
+        <div class="tv-card" style="margin-top:0">
+          <div class="tv-card-title">Speech recognition</div>
+          <div class="tv-evidence-row">
+            <span class="tv-evidence-label">ASR model</span>
+            <span style="font-size:13px;font-weight:500;color:#182235">{escape(asr_model_name())}</span>
+          </div>
+          <div class="tv-evidence-row" style="border-bottom:0">
+            <span class="tv-evidence-label">Status</span>
+            {'<span class="tv-badge tv-badge-ok">● Available</span>' if asr_ready else '<span class="tv-badge tv-badge-warn">● Unavailable</span>'}
+          </div>
+        </div>
+        """)
+
+    with col_policy:
+        render("""<div class="tv-card">
+          <div class="tv-card-title">Decision policy</div>
+        </div>""")
+
+        # Threshold
+        threshold_display = st.selectbox(
+            "Verification threshold",
+            ["Use backend policy", "Manual"],
+            key="settings_thresh_mode",
+        )
+
+        current_thresh = float(st.session_state.bona_threshold)
+        if threshold_display == "Manual":
+            new_thresh = st.slider(
+                "Threshold value",
+                min_value=0.0,
+                max_value=1.0,
+                value=current_thresh,
+                step=0.005,
+                format="%.3f",
+                key="settings_thresh_val",
+            )
+            if new_thresh != current_thresh:
+                st.session_state.bona_threshold = new_thresh
+                st.session_state.threshold_source = "manual override"
+
+        render(f"""
+        <div class="tv-evidence-row" style="margin-top:6px">
+          <span class="tv-evidence-label">Current threshold</span>
+          <span style="font-size:13px;font-weight:500;color:#182235">{current_thresh:.3f}</span>
+        </div>
+        <div class="tv-evidence-row">
+          <span class="tv-evidence-label">Source</span>
+          <span style="font-size:13px;color:#182235">{escape(str(st.session_state.threshold_source))}</span>
+        </div>
+        """)
+
+        # Unavailable evidence handling
+        unavail_choice = st.selectbox(
+            "Unavailable evidence",
+            ["Display as not available", "Treat as inconclusive", "Ignore"],
+            key="settings_unavail",
+        )
+
+        if st.button("Save preferences", use_container_width=True, type="primary", key="settings_save"):
+            st.success("Preferences saved for this session.")
+
+        # Reset thresholds
+        render("""<div style="margin-top:14px"></div>""")
+        if st.button("Reset to defaults", use_container_width=True, key="settings_reset"):
+            st.session_state.bona_threshold = DEFAULT_BONA_THRESHOLD
+            st.session_state.decision_band = DEFAULT_DECISION_BAND
+            st.session_state.threshold_source = "prototype default"
+            st.success("Thresholds reset.")
+            st.rerun()
+
+        # Band
+        render("""<div class="tv-card" style="margin-top:12px">
+          <div class="tv-card-title">Decision band</div>
+        </div>""")
+        current_band = float(st.session_state.decision_band)
+        new_band = st.slider(
+            "Decision band (±)",
+            0.0, 0.25, current_band, 0.005, format="%.3f",
+            key="settings_band",
+        )
+        if new_band != current_band:
+            st.session_state.decision_band = new_band
+
+    # Evaluation lab link
+    render("""<div style="margin-top:12px"></div>""")
+    render("""<div class="tv-card">
+      <div class="tv-card-title">Evaluation lab</div>
+      <div class="tv-muted" style="margin-bottom:10px">
+        Score labelled audio files against the current model. Upload REAL_… and SPOOF_… prefixed files.
+      </div>
+    </div>""")
+    if st.button("→ Open Evaluation Lab", use_container_width=True, key="settings_eval"):
+        st.session_state.ui_nav = "Evaluation Lab"
+        st.rerun()
+
+    render("""<div class="tv-footer">TRUSTVOICE AI · SIH prototype · settings affect this session only</div>""")
