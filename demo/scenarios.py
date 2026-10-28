@@ -93,6 +93,8 @@ SCENARIO_C = {
     ],
 }
 
+SCENARIOS = [SCENARIO_A, SCENARIO_B, SCENARIO_C]
+
 BENIGN_EXAMPLES = [
     ("BENIGN", "Hey, are we still meeting at five?"),
     ("BENIGN", "Can you send me yesterday's report?"),
