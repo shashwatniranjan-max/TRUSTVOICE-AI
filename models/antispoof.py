@@ -293,7 +293,7 @@ def analyze_audio_bytes(
 
     note("Decoding audio...")
     result = decode_audio_bytes(raw, filename)
-    samples = result.pop("samples", None)
+    samples = result.get("samples")
     if result.get("limitations") and samples is None:
         result["anti_spoof"] = None
         result["voice_error"] = result.get("user_error") or "; ".join(result["limitations"])

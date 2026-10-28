@@ -352,3 +352,50 @@ def re_enroll_profile(profile_id: str) -> dict | None:
     profs[profile_id]["enrolled_at"] = None
     _persist()
     return profs[profile_id]
+
+
+def verify_speaker_samples(samples, profile_id: str, sample_rate: int = 16000) -> dict:
+    """Compare incoming audio samples with an enrolled speaker's embedding.
+    Returns status: 'VERIFIED', 'MISMATCH', 'UNVERIFIED', or 'NOT_AVAILABLE'."""
+    profile = get_profile(profile_id)
+    if not profile:
+        return {"status": "UNVERIFIED", "similarity": 0.0, "reason": "Profile not found"}
+    if not profile.get("enrolled") or not profile.get("embedding"):
+        return {"status": "UNVERIFIED", "similarity": 0.0, "reason": "Speaker profile not enrolled"}
+    if samples is None or (hasattr(samples, "size") and samples.size == 0):
+        return {"status": "UNVERIFIED", "similarity": 0.0, "reason": "No audio samples available"}
+
+    enrolled_emb = profile.get("embedding")
+    try:
+        from models.antispoof import get_antispoof_session
+        session = get_antispoof_session("aasist", allow_download=False)
+        if session is None or np is None:
+            return {"status": "UNVERIFIED", "similarity": 0.0, "reason": "AASIST model unavailable for embedding"}
+
+        audio, sr = normalize_model_audio(samples, sample_rate)
+        logits = _extract_raw_logits(audio, sr, session)
+        sample_emb = _mean_embedding(logits)
+        if sample_emb is None:
+            return {"status": "UNVERIFIED", "similarity": 0.0, "reason": "Could not derive audio embedding"}
+
+        target = np.array(enrolled_emb, dtype=np.float32)
+        norm_s = float(np.linalg.norm(sample_emb))
+        norm_t = float(np.linalg.norm(target))
+        if norm_s > 1e-6 and norm_t > 1e-6:
+            cos_sim = float(np.dot(sample_emb, target) / (norm_s * norm_t))
+        else:
+            cos_sim = 0.0
+
+        eucl_dist = float(np.linalg.norm(sample_emb - target))
+        is_match = bool(cos_sim >= 0.80 or eucl_dist < 2.2)
+        status = "VERIFIED" if is_match else "MISMATCH"
+        return {
+            "status": status,
+            "match": is_match,
+            "similarity": round(max(0.0, min(1.0, (cos_sim + 1) / 2)), 3),
+            "distance": round(eucl_dist, 3),
+            "profile_name": profile.get("name"),
+            "profile_role": profile.get("role"),
+        }
+    except Exception as exc:
+        return {"status": "UNVERIFIED", "similarity": 0.0, "reason": str(exc)}

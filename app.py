@@ -95,6 +95,12 @@ def init_state():
         "incidents_selected": None,
         # handshake
         "handshake_result": None,
+        # live monitor
+        "lm_stream_step": 0,
+        "lm_stream_running": False,
+        "lm_handshake_triggered": False,
+        "lm_live_audio": None,
+        "lm_live_result": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:

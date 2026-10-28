@@ -188,19 +188,44 @@ def sniff_audio_kind(raw: bytes, filename: str = "") -> str:
 
 def ffmpeg_executable() -> str | None:
     global _FFMPEG_EXE, _FFMPEG_CHECKED
-    if _FFMPEG_CHECKED:
+    if _FFMPEG_CHECKED and _FFMPEG_EXE and os.path.exists(_FFMPEG_EXE):
         return _FFMPEG_EXE
-    _FFMPEG_CHECKED = True
     found = shutil.which("ffmpeg")
     if found:
         _FFMPEG_EXE = found
+        _FFMPEG_CHECKED = True
         return _FFMPEG_EXE
+    candidate_paths = [
+        "/opt/homebrew/bin/ffmpeg",
+        "/usr/local/bin/ffmpeg",
+        "/usr/bin/ffmpeg",
+        "/bin/ffmpeg",
+        "/snap/bin/ffmpeg",
+        os.path.expanduser("~/.local/bin/ffmpeg"),
+        os.path.expanduser("~/bin/ffmpeg"),
+    ]
+    import sys
+    if getattr(sys, "prefix", None):
+        candidate_paths.append(os.path.join(sys.prefix, "bin", "ffmpeg"))
+    for p in candidate_paths:
+        try:
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                _FFMPEG_EXE = p
+                _FFMPEG_CHECKED = True
+                return _FFMPEG_EXE
+        except Exception:
+            continue
     try:
         import imageio_ffmpeg
-        _FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if exe and os.path.exists(exe):
+            _FFMPEG_EXE = exe
+            _FFMPEG_CHECKED = True
+            return _FFMPEG_EXE
     except Exception:
-        _FFMPEG_EXE = None
-    return _FFMPEG_EXE
+        pass
+    _FFMPEG_CHECKED = True
+    return None
 
 
 def ffmpeg_available() -> bool:
@@ -237,6 +262,36 @@ def _ffmpeg_to_wav16k(raw: bytes, suffix: str) -> tuple[bytes | None, str | None
         return None, f"{type(exc).__name__}: {exc}"
 
 
+def _decode_via_wave(wav_bytes: bytes):
+    """Pure Python standard-library wave module decoder for uncompressed WAV buffers."""
+    if np is None:
+        return None
+    try:
+        import wave
+        with wave.open(io.BytesIO(wav_bytes), "rb") as wf:
+            n_ch = wf.getnchannels()
+            sw = wf.getsampwidth()
+            sr = wf.getframerate()
+            frames = wf.readframes(wf.getnframes())
+            if sw == 2:
+                arr = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+            elif sw == 4:
+                arr = np.frombuffer(frames, dtype=np.int32).astype(np.float32) / 2147483648.0
+            elif sw == 1:
+                arr = (np.frombuffer(frames, dtype=np.uint8).astype(np.float32) - 128.0) / 128.0
+            else:
+                return None
+            if n_ch > 1:
+                arr = arr.reshape(-1, n_ch).mean(axis=1)
+            if sr != 16000 and librosa is not None:
+                arr = librosa.resample(arr, orig_sr=sr, target_sr=16000, res_type="kaiser_fast")
+                sr = 16000
+            return np.ascontiguousarray(arr, dtype=np.float32), int(sr)
+    except Exception:
+        pass
+    return None
+
+
 def _pcm_from_wav_bytes(wav_bytes: bytes):
     if np is None:
         return None
@@ -250,11 +305,37 @@ def _pcm_from_wav_bytes(wav_bytes: bytes):
         return np.ascontiguousarray(y, dtype=np.float32), int(sr)
     except Exception:
         pass
-    if librosa is None:
+    if librosa is not None:
+        try:
+            y, sr = librosa.load(io.BytesIO(wav_bytes), sr=16000, mono=True)
+            return np.ascontiguousarray(np.asarray(y, dtype=np.float32).reshape(-1)), 16000
+        except Exception:
+            pass
+    # Pure Python wave module fallback for uncompressed WAV
+    return _decode_via_wave(wav_bytes)
+
+
+def _try_pyav_pcm(raw: bytes):
+    """Decode compressed container audio (WebM, Opus, MP4, AAC, MP3) in-memory using PyAV."""
+    if np is None:
         return None
     try:
-        y, sr = librosa.load(io.BytesIO(wav_bytes), sr=16000, mono=True)
-        return np.ascontiguousarray(np.asarray(y, dtype=np.float32).reshape(-1)), 16000
+        import av
+        container = av.open(io.BytesIO(raw))
+        stream = next((s for s in container.streams if s.type == "audio"), None)
+        if not stream:
+            return None
+        resampler = av.AudioResampler(format="fltp", layout="mono", rate=16000)
+        frames = []
+        for frame in container.decode(stream):
+            for rframe in resampler.resample(frame):
+                frames.append(rframe.to_ndarray())
+        if not frames:
+            return None
+        arr = np.concatenate(frames, axis=1).reshape(-1).astype(np.float32)
+        if arr.size == 0:
+            return None
+        return np.ascontiguousarray(arr, dtype=np.float32), 16000
     except Exception:
         return None
 
@@ -303,6 +384,15 @@ def decode_audio_bytes(raw: bytes, filename: str) -> dict:
         loaded = _try_direct_pcm(raw)
         if loaded is not None:
             result["decode_path"] = "direct"
+
+    # PyAV in-memory decoding
+    if loaded is None:
+        loaded = _try_pyav_pcm(raw)
+        if loaded is not None:
+            result["decode_path"] = "pyav"
+            result["analysis_mode"] = "PyAV 16 kHz mono PCM"
+
+    # FFmpeg CLI subprocess conversion
     if loaded is None:
         wav_bytes, ferr = _ffmpeg_to_wav16k(raw, kind if kind != "unknown" else Path(filename).suffix.lower())
         if wav_bytes:
