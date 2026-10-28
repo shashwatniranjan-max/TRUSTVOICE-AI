@@ -109,6 +109,24 @@ def analyse_context(
     else:
         level = "ANOMALY"
 
+    # Structured context assessment audit
+    auth_status = "AUTHORIZED" if (identity_status == "VERIFIED" and not off_channel) else (
+        "PROHIBITED_CHANNEL" if (identity_status == "VERIFIED" and off_channel) else (
+            "BIOMETRIC_MISMATCH" if identity_status == "MISMATCH" else "UNVERIFIED_AUTHORITY"
+        )
+    )
+
+    context_audit = {
+        "identity_status": identity_status,
+        "is_sensitive_request": (intent in SENSITIVE_INTENTS or sensitive_doc),
+        "is_unusual_destination": bool(new_account or off_channel),
+        "is_off_channel": bool(off_channel),
+        "authorization_status": auth_status,
+        "channel_type": "Personal / External Channel" if off_channel else "Standard In-Band Channel",
+        "prior_turns_count": len(prior_intents),
+        "escalating_history": bool(prior_sensitive),
+    }
+
     return {
         "Context Safety": safety,
         "context_level": level,
@@ -116,4 +134,5 @@ def analyse_context(
         "notes": notes,
         "off_channel": off_channel,
         "new_destination": new_account or off_channel,
+        "audit": context_audit,
     }

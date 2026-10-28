@@ -15,14 +15,14 @@ SENSITIVE_INTENTS = {
 }
 
 CUES = [
-    ("urgency", r"\b(immediately|right now|urgent(ly)?|hurry|quickly|at once|do it now|abhi)\b", "Urgency"),
-    ("soft_deadline", r"\b(today|by eod|this evening)\b", "Time expectation"),
-    ("threat", r"\b(will be (blocked|suspended|closed|frozen)|permanently blocked|legal action|arrest|you will lose|otherwise)\b", "Threat / consequence framing"),
-    ("secrecy", r"\b(don't tell anyone|do not tell anyone|keep this secret|don't mention|no one should know|keep this between us)\b", "Secrecy"),
-    ("isolation", r"\b(don't hang up|do not hang up|don't disconnect|stay on the (line|call)|don't call (the )?bank)\b", "Isolation attempt"),
-    ("verification_bypass", r"\b(trust me|no need to (verify|check|confirm)|skip the (verification|process)|don't mention this to anyone|don't verify)\b", "Verification bypass"),
-    ("artificial_deadline", r"\b(last (chance|warning)|final notice|expires? (today|in)|in \d+ minutes?|before (evening|5 ?pm))\b", "Artificial deadline"),
-    ("authority_claim", r"\b(i am (calling from|your manager|from (your )?bank|the manager)|this is (your )?bank|security department|bank security)\b", "Authority claim"),
+    ("urgency", r"\b(immediately|right now|urgent(ly)?|hurry|quickly|at once|do it now|abhi)\b", "Urgency", "Severe time contraction to bypass deliberative thought"),
+    ("threat", r"\b(will be (blocked|suspended|closed|frozen)|permanently blocked|legal action|arrest|you will lose|otherwise)\b", "Threats & Consequences", "Punitive or alarming consequences to coerce compliance"),
+    ("secrecy", r"\b(don't tell anyone|do not tell anyone|keep this secret|don't mention|no one should know|keep this between us)\b", "Secrecy & Concealment", "Attempts to hide the transaction or request from internal colleagues or family"),
+    ("isolation", r"\b(don't hang up|do not hang up|don't disconnect|stay on the (line|call)|don't call (the )?bank)\b", "Caller Isolation", "Preventing the victim from contacting official support or external advisers"),
+    ("verification_bypass", r"\b(trust me|no need to (verify|check|confirm)|skip the (verification|process)|don't mention this to anyone|don't verify)\b", "Verification Bypass", "Explicitly urging the target to disregard normal authentication safeguards"),
+    ("authority_claim", r"\b(i am (calling from|your manager|from (your )?bank|the manager)|this is (your )?bank|security department|bank security)\b", "Authority Claim", "Invoking management hierarchy, executive status, or bank authority"),
+    ("artificial_deadline", r"\b(last (chance|warning)|final notice|expires? (today|in)|in \d+ minutes?|before (evening|5 ?pm))\b", "Artificial Deadline", "Fabricating immediate expiration or deadline to rush execution"),
+    ("soft_deadline", r"\b(today|by eod|this evening)\b", "Time Expectation", "Standard temporal expectation for request completion"),
 ]
 
 
@@ -30,49 +30,113 @@ def analyse_behaviour(text: str, intent: str = "normal_conversation") -> dict:
     clean = clean_text(text)
     signals = []
     labels = []
-    for key, pattern, label in CUES:
-        if re.search(pattern, clean, flags=re.I):
+    matches = {}
+    for key, pattern, label, _ in CUES:
+        m = re.search(pattern, clean, flags=re.I)
+        if m:
             signals.append(key)
             labels.append(label)
+            matches[key] = m.group(0)
 
     if re.search(r"\bwhen you (have time|can)\b", clean, flags=re.I):
         signals = [s for s in signals if s not in {"soft_deadline", "urgency"}]
-        labels = [lb for lb in labels if lb not in {"Time expectation", "Urgency"}]
+        labels = [lb for lb in labels if lb not in {"Time Expectation", "Urgency"}]
+        matches.pop("soft_deadline", None)
+        matches.pop("urgency", None)
 
     sensitive = intent in SENSITIVE_INTENTS
     penalty = 0
     notes = []
+    indicator_audit = []
 
+    # Calculate penalties per indicator
+    for key, pattern, label, desc in CUES:
+        is_detected = key in signals
+        cue_penalty = 0
+        cue_sev = "LOW"
+        cue_exp = desc
+
+        if key in ("urgency", "artificial_deadline"):
+            if is_detected:
+                if sensitive:
+                    cue_penalty = 18
+                    cue_sev = "CRITICAL" if key == "urgency" else "HIGH"
+                    cue_exp = "Urgent pacing paired with a high-sensitivity request significantly lowers trust."
+                else:
+                    cue_penalty = 40
+                    cue_sev = "MEDIUM"
+                    cue_exp = "Strong urgency language detected without explicit sensitive payload."
+
+        elif key == "soft_deadline":
+            if is_detected and "urgency" not in signals:
+                cue_penalty = 18
+                cue_sev = "LOW"
+                cue_exp = "Same-day deadline expectation noted."
+
+        elif key == "threat":
+            if is_detected:
+                cue_penalty = 16 if sensitive else 8
+                cue_sev = "CRITICAL" if sensitive else "HIGH"
+                cue_exp = "Coercive threat/consequence language detected."
+
+        elif key == "secrecy":
+            if is_detected:
+                cue_penalty = 20 if sensitive else 10
+                cue_sev = "CRITICAL" if sensitive else "HIGH"
+                cue_exp = "Caller demands concealment or secrecy, characteristic of social engineering."
+
+        elif key == "isolation":
+            if is_detected:
+                cue_penalty = 14
+                cue_sev = "HIGH"
+                cue_exp = "Attempting to isolate the listener and prevent external confirmation."
+
+        elif key == "verification_bypass":
+            if is_detected:
+                cue_penalty = 16 if sensitive else 8
+                cue_sev = "CRITICAL" if sensitive else "HIGH"
+                cue_exp = "Directly instructing target to bypass standard verification protocols."
+
+        elif key == "authority_claim":
+            if is_detected:
+                cue_penalty = 10 if sensitive else 0
+                cue_sev = "HIGH" if sensitive else "INFORMATIONAL"
+                cue_exp = "Authority or executive standing claimed during conversation."
+
+        penalty += cue_penalty
+        indicator_audit.append({
+            "key": key,
+            "label": label,
+            "detected": is_detected,
+            "evidence": matches.get(key),
+            "severity": cue_sev if is_detected else "NONE",
+            "penalty": cue_penalty,
+            "explanation": cue_exp,
+        })
+
+    # Summary notes matching legacy test expectations
     if "urgency" in signals or "artificial_deadline" in signals:
         if sensitive:
-            penalty += 18
             notes.append("Urgency combined with a sensitive request")
         else:
-            penalty += 40
             notes.append("Strong urgency language (not by itself a critical interaction)")
 
     if "soft_deadline" in signals and "urgency" not in signals:
-        penalty += 18
         notes.append("Same-day time expectation")
 
     if "threat" in signals:
-        penalty += 16 if sensitive else 8
         notes.append("Threat / consequence language")
 
     if "secrecy" in signals:
-        penalty += 20 if sensitive else 10
         notes.append("Secrecy request")
 
     if "isolation" in signals:
-        penalty += 14
         notes.append("Isolation attempt")
 
     if "verification_bypass" in signals:
-        penalty += 16 if sensitive else 8
         notes.append("Verification bypass language")
 
     if "authority_claim" in signals and sensitive:
-        penalty += 10
         notes.append("Authority claim alongside a sensitive request")
 
     combo = len(signals)
@@ -97,6 +161,9 @@ def analyse_behaviour(text: str, intent: str = "normal_conversation") -> dict:
         "signals": signals,
         "signal_labels": labels,
         "notes": notes,
+        "indicators": indicator_audit,
+        "detected_count": len(signals),
+        "total_indicators_evaluated": len(CUES),
         "disclaimer": "Observable social-engineering indicators detected."
         if signals else "No major social-engineering indicators observed.",
     }

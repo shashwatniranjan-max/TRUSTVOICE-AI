@@ -250,6 +250,11 @@ def _evidence_summary_html(result: dict) -> str:
     if len(result.get("transcript") or "") > 120:
         transcript += "…"
 
+    prelim = result.get("fused_uncapped")
+    gates_fired = result.get("gates") or []
+    gate_str = ", ".join(gates_fired) if gates_fired else "None (Linear sum)"
+    signals_sum = result.get("signals_summary") or {}
+
     rows = [
         ("Voice authenticity", result.get("voice_display") or result.get("voice_label") or "—"),
         ("Speaker identity", str(result.get("identity_status") or "—").replace("_", " ")),
@@ -257,6 +262,9 @@ def _evidence_summary_html(result: dict) -> str:
         ("Intent", intent),
         ("Behaviour", behaviour),
         ("Context", context),
+        ("Preliminary score", f"{prelim} / 100" if prelim is not None else "—"),
+        ("Safety gates", gate_str),
+        ("Active risk cues", f"{signals_sum.get('active_threats_count', 0)} detected ({signals_sum.get('dimensions_affected_count', 0)} dims affected)"),
         ("Final risk", result.get("interaction_risk") or "—"),
         ("Decision", result.get("action") or "—"),
     ]

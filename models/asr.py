@@ -258,6 +258,15 @@ def transcribe_pcm(
                 detected_lang = "en"
                 lang_prob = float(getattr(info_en, "language_probability", 0.90) or 0.90)
 
+        formatted_segments = []
+        for s in (segments_list if 'segments_list' in locals() else []):
+            s_text = clean_transcript_text(getattr(s, "text", "") or "")
+            if s_text:
+                formatted_segments.append({
+                    "start": round(float(getattr(s, "start", 0.0) or 0.0), 2),
+                    "end": round(float(getattr(s, "end", 0.0) or 0.0), 2),
+                    "text": s_text,
+                })
         elapsed = round(time.perf_counter() - started, 3)
         language_out = str(detected_lang).strip() if detected_lang else target_lang
 
