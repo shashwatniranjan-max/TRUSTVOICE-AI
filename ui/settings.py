@@ -91,18 +91,95 @@ def render_settings():
             st.session_state.model_choice = model_key
             st.success("Model updated.")
 
-        # ASR model info
+        # Speech recognition settings
+        render("""<div class="tv-card" style="margin-top:0">
+          <div class="tv-card-title">Speech recognition & transcription</div>
+        </div>""")
+
+        asr_model_labels = {
+            "base": "base — Recommended (Balanced speed & high accuracy)",
+            "small": "small — High Accuracy (Best for accents & noise)",
+            "tiny": "tiny — Ultra-fast (Lower accuracy)",
+            "base.en": "base.en — English-only (Fast & high accuracy)",
+            "small.en": "small.en — English-only (High accuracy)",
+            "medium": "medium — Maximum Accuracy (Enterprise)",
+        }
+        current_asr_model = st.session_state.get("asr_model_choice", asr_model_name())
+        if current_asr_model not in asr_model_labels:
+            current_asr_model = "base"
+
+        selected_asr_model = st.selectbox(
+            "Speech recognition model",
+            list(asr_model_labels.keys()),
+            index=list(asr_model_labels.keys()).index(current_asr_model),
+            format_func=lambda k: asr_model_labels.get(k, k),
+            key="settings_asr_model",
+            help="Higher accuracy models drastically reduce word errors, misheard numbers, and dropped phrases.",
+        )
+        if selected_asr_model != st.session_state.get("asr_model_choice"):
+            st.session_state.asr_model_choice = selected_asr_model
+
+        col_lang, col_beam = st.columns(2)
+        with col_lang:
+            lang_options = {
+                "en": "English (en)",
+                "auto": "Auto-detect",
+                "es": "Spanish (es)",
+                "fr": "French (fr)",
+                "de": "German (de)",
+                "hi": "Hindi (hi)",
+                "zh": "Chinese (zh)",
+            }
+            current_lang = st.session_state.get("asr_language", "en")
+            if current_lang not in lang_options:
+                current_lang = "en"
+            selected_lang = st.selectbox(
+                "Spoken language",
+                list(lang_options.keys()),
+                index=list(lang_options.keys()).index(current_lang),
+                format_func=lambda k: lang_options.get(k, k),
+                key="settings_asr_lang",
+                help="Setting an explicit language prevents false foreign-language hallucinations on accented or quiet audio.",
+            )
+            if selected_lang != st.session_state.get("asr_language"):
+                st.session_state.asr_language = selected_lang
+
+        with col_beam:
+            mode_options = {
+                "accurate": "Beam Search (size=5 · Accurate)",
+                "fast": "Greedy (size=1 · Fast)",
+            }
+            current_mode = st.session_state.get("asr_quality_mode", "accurate")
+            if current_mode not in mode_options:
+                current_mode = "accurate"
+            selected_mode = st.selectbox(
+                "Decoding accuracy",
+                list(mode_options.keys()),
+                index=list(mode_options.keys()).index(current_mode),
+                format_func=lambda k: mode_options.get(k, k),
+                key="settings_asr_mode",
+                help="Beam search explores multiple hypotheses to avoid acoustic transcription mistakes.",
+            )
+            if selected_mode != st.session_state.get("asr_quality_mode"):
+                st.session_state.asr_quality_mode = selected_mode
+
+        boost_prompt = st.checkbox(
+            "Boost security & financial terminology",
+            value=bool(st.session_state.get("asr_domain_prompt", True)),
+            key="settings_asr_prompt",
+            help="Primes Whisper's vocabulary with security terms like OTP, wire transfer, SWIFT, credentials, and verification codes.",
+        )
+        if boost_prompt != st.session_state.get("asr_domain_prompt"):
+            st.session_state.asr_domain_prompt = boost_prompt
+
         render(f"""
-        <div class="tv-card" style="margin-top:0">
-          <div class="tv-card-title">Speech recognition</div>
-          <div class="tv-evidence-row">
-            <span class="tv-evidence-label">ASR model</span>
-            <span style="font-size:13px;font-weight:500;color:var(--tv-text)">{escape(asr_model_name())}</span>
-          </div>
-          <div class="tv-evidence-row" style="border-bottom:0">
-            <span class="tv-evidence-label">Status</span>
-            {'<span class="tv-badge tv-badge-ok">● Available</span>' if asr_ready else '<span class="tv-badge tv-badge-warn">● Unavailable</span>'}
-          </div>
+        <div class="tv-evidence-row" style="margin-top:8px">
+          <span class="tv-evidence-label">Active ASR engine</span>
+          <span style="font-size:13px;font-weight:500;color:var(--tv-text)">faster-whisper ({escape(st.session_state.get('asr_model_choice', 'base'))})</span>
+        </div>
+        <div class="tv-evidence-row" style="border-bottom:0">
+          <span class="tv-evidence-label">Service status</span>
+          {'<span class="tv-badge tv-badge-ok">● Ready</span>' if asr_ready else '<span class="tv-badge tv-badge-warn">● Unavailable</span>'}
         </div>
         """)
 

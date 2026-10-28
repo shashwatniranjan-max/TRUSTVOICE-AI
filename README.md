@@ -17,10 +17,12 @@ calibrated detector accuracy.
   (`models/aasist.onnx` is the small default). Output is an *authenticity
   score* plus LIKELY AUTHENTIC / LIKELY SPOOF / INCONCLUSIVE, with an
   uncertainty band. Poor audio is inconclusive, not an alarm.
-- **ASR:** local faster-whisper on CPU (default model `tiny`, override with
-  `TRUSTVOICE_ASR_MODEL`, e.g. `base`). First load is cached in process.
-  Transcripts are **not** guaranteed accurate. ASR does not decide whether
-  a voice is synthetic.
+- **ASR:** local faster-whisper on CPU (default model `base`, with `small`,
+  `tiny`, `base.en`, `small.en` selectable in Settings or via `TRUSTVOICE_ASR_MODEL`).
+  Includes beam search (size=5), dynamic range audio normalization, domain vocabulary
+  prompting (OTP, wire transfer, banking terms), and dual VAD/language fallbacks.
+  First load is cached in process. Transcripts are **not** guaranteed 100% accurate.
+  ASR does not decide whether a voice is synthetic.
 - **Interaction analysis:** TF-IDF + logistic regression intent classifier,
   regex entities, behavioural cues, context anomalies, conversation state.
 - **Fusion:** prototype weights in `risk/config.py`. Hard gates require
@@ -63,7 +65,7 @@ file is missing.
 ASR weights download once into the Hugging Face cache **on the server**. End-user
 laptops do not install Whisper. Streamlit Cloud / Codespaces should install
 `packages.txt` (`ffmpeg`) so MP3/M4A/WhatsApp/WebM decode reliably; `imageio-ffmpeg`
-is a bundled fallback. Prefer `TRUSTVOICE_ASR_MODEL=tiny` (default). Clips longer
+is a bundled fallback. Default model is `TRUSTVOICE_ASR_MODEL=base` (or select in Settings). Clips longer
 than `TRUSTVOICE_ASR_MAX_SEC` (default 120) are transcribed only for the first
 window, with a note. Evaluation-lab anti-spoof runs do **not** load Whisper.
 

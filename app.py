@@ -82,6 +82,11 @@ def init_state():
         "transcript_source": "NONE",
         "live_warning": None,
         "asr_filled_transcript": "",
+        # speech recognition settings
+        "asr_model_choice": "base",
+        "asr_language": "en",
+        "asr_quality_mode": "accurate",
+        "asr_domain_prompt": True,
         # speakers
         "speakers_view": "gallery",
         "speakers_selected_id": None,

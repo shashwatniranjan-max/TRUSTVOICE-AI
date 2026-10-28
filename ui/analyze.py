@@ -182,6 +182,26 @@ def render_analyze():
         render("""<div class="tv-card">""")
         render("""<div class="tv-card-title">Transcript & speaker identity</div>""")
 
+        # ASR status and intelligence badge if audio has been transcribed
+        last_asr = audio.get("asr") or {}
+        if last_asr.get("status") == "success" and last_asr.get("transcript"):
+            model_disp = escape(str(last_asr.get("model") or "base"))
+            lang_disp = escape(str(last_asr.get("language") or "en")).upper()
+            prob = last_asr.get("language_probability")
+            prob_disp = f" ({int(prob * 100)}%)" if prob else ""
+            beam_disp = escape(str(last_asr.get("beam_size") or 5))
+            sec_disp = f"{last_asr.get('elapsed_sec')}s" if last_asr.get("elapsed_sec") is not None else ""
+            meta_str = f"Model: <b>{model_disp}</b> · Lang: <b>{lang_disp}{prob_disp}</b> · Beam: <b>{beam_disp}</b>"
+            if sec_disp:
+                meta_str += f" · Latency: <b>{sec_disp}</b>"
+            render(f"""
+            <div style="margin-bottom:8px;padding:6px 10px;background:var(--tv-surface);border-radius:6px;
+                 border:1px solid var(--tv-border);font-size:12px;color:var(--tv-text);display:flex;align-items:center;gap:6px">
+              <span style="color:var(--tv-blue);font-weight:600">🎙️ ASR</span>
+              <span>{meta_str}</span>
+            </div>
+            """)
+
         transcript = st.text_area(
             "Transcript",
             height=88,
@@ -281,9 +301,16 @@ def render_analyze():
                     def _prog(msg: str):
                         status_box.write(msg)
 
+                    asr_model = st.session_state.get("asr_model_choice", asr_model_name())
+                    asr_lang = st.session_state.get("asr_language", "en")
+                    asr_beam = 5 if st.session_state.get("asr_quality_mode", "accurate") == "accurate" else 1
+                    asr_prompt_on = st.session_state.get("asr_domain_prompt", True)
+                    from models.asr import DEFAULT_ASR_PROMPT
+                    asr_prompt_str = DEFAULT_ASR_PROMPT if asr_prompt_on else None
+
                     try:
-                        _prog("Loading speech recognition model…")
-                        _cached_asr_model(asr_model_name())
+                        _prog(f"Loading speech recognition model ({asr_model})…")
+                        _cached_asr_model(asr_model)
                     except Exception:
                         _prog("ASR unavailable — transcription skipped.")
 
@@ -295,6 +322,10 @@ def render_analyze():
                         threshold_source=st.session_state.threshold_source,
                         allow_download=True,
                         transcribe=True,
+                        asr_model=asr_model,
+                        asr_language=asr_lang,
+                        asr_beam_size=asr_beam,
+                        asr_prompt=asr_prompt_str,
                         on_progress=_prog,
                     )
                     if audio_result.get("user_error"):

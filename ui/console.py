@@ -179,9 +179,16 @@ def render_console():
                     def _progress(message: str):
                         status_box.write(message)
 
+                    asr_model = st.session_state.get("asr_model_choice", asr_model_name())
+                    asr_lang = st.session_state.get("asr_language", "en")
+                    asr_beam = 5 if st.session_state.get("asr_quality_mode", "accurate") == "accurate" else 1
+                    asr_prompt_on = st.session_state.get("asr_domain_prompt", True)
+                    from models.asr import DEFAULT_ASR_PROMPT
+                    asr_prompt_str = DEFAULT_ASR_PROMPT if asr_prompt_on else None
+
                     try:
-                        _progress("Loading speech-to-text model...")
-                        _cached_asr_model(asr_model_name())
+                        _progress(f"Loading speech-to-text model ({asr_model})...")
+                        _cached_asr_model(asr_model)
                     except Exception:
                         _progress(
                             "ASR is unavailable on the server because the ASR runtime "
@@ -195,6 +202,10 @@ def render_console():
                         threshold_source=st.session_state.threshold_source,
                         allow_download=True,
                         transcribe=True,
+                        asr_model=asr_model,
+                        asr_language=asr_lang,
+                        asr_beam_size=asr_beam,
+                        asr_prompt=asr_prompt_str,
                         on_progress=_progress,
                     )
                     if audio_result.get("user_error"):

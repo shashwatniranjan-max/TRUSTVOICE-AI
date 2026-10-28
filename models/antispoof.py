@@ -281,6 +281,10 @@ def analyze_audio_bytes(
     threshold_source: str = "default (uncalibrated)",
     allow_download: bool = True,
     transcribe: bool = False,
+    asr_model: str | None = None,
+    asr_language: str | None = None,
+    asr_beam_size: int | None = None,
+    asr_prompt: str | None = None,
     on_progress=None,
 ) -> dict:
     def note(message: str):
@@ -295,7 +299,11 @@ def analyze_audio_bytes(
         result["voice_error"] = result.get("user_error") or "; ".join(result["limitations"])
         if transcribe:
             from models.asr import transcribe_pcm
-            result["asr"] = transcribe_pcm(None, 16000, duration=result.get("duration"))
+            result["asr"] = transcribe_pcm(
+                None, 16000, duration=result.get("duration"),
+                model_name=asr_model, language=asr_language,
+                beam_size=asr_beam_size or 5, initial_prompt=asr_prompt,
+            )
         return result
     if samples is None:
         result["voice_error"] = result.get("user_error") or (
@@ -303,7 +311,11 @@ def analyze_audio_bytes(
         )
         if transcribe:
             from models.asr import transcribe_pcm
-            result["asr"] = transcribe_pcm(None, int(result.get("sample_rate") or 16000), duration=result.get("duration"))
+            result["asr"] = transcribe_pcm(
+                None, int(result.get("sample_rate") or 16000), duration=result.get("duration"),
+                model_name=asr_model, language=asr_language,
+                beam_size=asr_beam_size or 5, initial_prompt=asr_prompt,
+            )
         return result
     try:
         note("Running voice authenticity analysis...")
@@ -328,6 +340,10 @@ def analyze_audio_bytes(
             samples,
             int(result.get("sample_rate") or 16000),
             duration=result.get("duration"),
+            model_name=asr_model,
+            language=asr_language,
+            beam_size=asr_beam_size or 5,
+            initial_prompt=asr_prompt,
         )
         if result["asr"].get("status") == "success":
             result["analysis_mode"] += " + local ASR"
