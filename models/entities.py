@@ -10,11 +10,13 @@ ENTITY_SPECS = [
     (
         "AMOUNT",
         re.compile(
-            r"(?:₹\s*\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|₹\s*\d+(?:\.\d+)?|"
-            r"(?:rs\.?|inr)\s*\d{1,3}(?:,\d{2,3})+|"
-            r"(?:rs\.?|inr)\s*\d{4,}|"
-            r"\b\d{1,3}(?:,\d{2,3})+\s*(?:rupees?|rs)?|"
-            r"\b(?:fifty|two|one|five)\s+(?:thousand|lakh|lac)\s+(?:rupees?)?)",
+            r"(?:[\$₹€£]\s*\d{1,3}(?:,\d{3})*(?:\.\d+)?|"
+            r"[\$₹€£]\s*\d+(?:\.\d+)?|"
+            r"(?:rs\.?|inr|usd|eur|gbp)\s*\d{1,3}(?:,\d{2,3})*(?:\.\d+)?|"
+            r"(?:rs\.?|inr|usd|eur|gbp)\s*\d+(?:\.\d+)?|"
+            r"\b\d{1,3}(?:,\d{2,3})*(?:\.\d+)?\s*(?:rupees?|rs\.?|inr|dollars?|usd|bucks|euros?|pounds?)\b|"
+            r"\b\d{3,}\s*(?:rupees?|rs\.?|inr|dollars?|usd|bucks|euros?|pounds?)\b|"
+            r"\b(?:thirty|fifty|twenty|forty|ten|two|one|five|hundred)\s+(?:thousand|million|lakh|lac)\s*(?:rupees?|dollars?|usd)?\b)",
             re.I,
         ),
     ),
@@ -53,7 +55,8 @@ ENTITY_SPECS = [
         "DESTINATION",
         re.compile(
             r"\b(?:personal (?:email|gmail|number|account)|gmail|"
-            r"new (?:bank )?account|different account|this account)\b",
+            r"new (?:bank )?account|different account|this account|"
+            r"send (?:to )?me|pay (?:to )?me|transfer to me|my wallet|my address)\b",
             re.I,
         ),
     ),
@@ -71,7 +74,10 @@ ENTITY_SPECS = [
         re.compile(
             r"\b(?:your manager|i am (?:your )?manager|\bmanager\b|"
             r"from (?:your )?bank|security (?:department|team)|bank security team|"
-            r"\bceo\b|\bhr\b|fraud team)\b",
+            r"\bceo\b|\bhr\b|fraud team|"
+            r"from\s+(?:microsoft|apple|google|amazon|windows|tech support|it support|help desk|support team|service center|the police|police|cbi|fbi|irs)|"
+            r"(?:tech support|it support|help desk|support agent|technician|system administrator)|"
+            r"(?:apple|microsoft|google|amazon)\s+(?:support|security|team))\b",
             re.I,
         ),
     ),

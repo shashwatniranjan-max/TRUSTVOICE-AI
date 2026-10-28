@@ -59,10 +59,10 @@ SAFETY_GATE_SPECS = [
         "id": "GATE_FINANCIAL_NEW_DEST_PRESSURE",
         "name": "Financial Transfer to New Destination under Pressure",
         "category": "Financial Security",
-        "cap": 28,
+        "cap": 22,
         "forced_risk": "CRITICAL",
-        "rationale": "Rerouting funds toward an unfamiliar destination under urgent deadlines is the primary vector for wire transfer fraud.",
-        "condition_desc": "intent=financial_request AND new_destination AND (urgency OR artificial_deadline)",
+        "rationale": "Rerouting funds toward an unfamiliar destination or demanding payments under urgency, threats, or extortion is the primary vector for wire transfer fraud.",
+        "condition_desc": "intent=financial_request AND (new_destination OR unverified) AND (urgency OR artificial_deadline OR threat OR secrecy)",
     },
     {
         "id": "GATE_FINANCIAL_NEW_DEST",
@@ -167,8 +167,8 @@ def evaluate_safety_gates_detailed(
             if credential:
                 triggered = True
         elif gid == "GATE_FINANCIAL_NEW_DEST_PRESSURE":
-            if financial and evidence.get("new_destination") and (
-                "urgency" in pressure or "artificial_deadline" in pressure
+            if financial and (evidence.get("new_destination") or unverified) and (
+                "urgency" in pressure or "artificial_deadline" in pressure or "threat" in pressure or "secrecy" in pressure
             ):
                 triggered = True
         elif gid == "GATE_FINANCIAL_NEW_DEST":
@@ -217,7 +217,10 @@ def evaluate_safety_gates_detailed(
             elif gid == "GATE_CRED_DIRECT" and not caps:
                 caps.append("Direct credential solicitation")
             elif gid == "GATE_FINANCIAL_NEW_DEST_PRESSURE":
-                caps.append("Financial transfer to a new destination under time pressure")
+                if "threat" in pressure:
+                    caps.append("Financial demand under threat / scare tactics from unverified caller")
+                else:
+                    caps.append("Financial transfer to a new destination under time pressure")
             elif gid == "GATE_FINANCIAL_NEW_DEST" and not any("Financial transfer" in c for c in caps):
                 caps.append("Financial transfer toward a new or unusual destination")
             elif gid == "GATE_SENSITIVE_OFF_CHANNEL_PRESSURE":

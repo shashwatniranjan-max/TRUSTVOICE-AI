@@ -178,6 +178,18 @@ INTENT_TRAINING = [
     ("sensitive_data_request", "Send the employee database to rahul@gmail.com."),
 
     # --- financial_request ---
+    ("financial_request", "Send me $30,000 to fix it."),
+    ("financial_request", "You need to send me $30,000 to fix your computer."),
+    ("financial_request", "Send $500 to our technician immediately to remove the virus."),
+    ("financial_request", "You need to pay $3000 to clean the malware."),
+    ("financial_request", "Transfer $2,500 to complete the security service."),
+    ("financial_request", "Send money to fix the virus on your computer."),
+    ("financial_request", "You must wire 5000 dollars right now."),
+    ("financial_request", "Pay $1000 to unblock your computer."),
+    ("financial_request", "Transfer $15,000 to the technician's account."),
+    ("financial_request", "Send me the thirty thousand dollars today."),
+    ("financial_request", "You have to pay $500 fee for tech support."),
+    ("financial_request", "Send thirty thousand dollars immediately."),
     ("financial_request", "Transfer fifty thousand rupees to this account."),
     ("financial_request", "Transfer ₹50,000 to this new account."),
     ("financial_request", "Transfer ₹50,000 to account 1234567890."),

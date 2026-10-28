@@ -37,18 +37,29 @@ def analyse_context(
         v in clean for v in ("send", "mail", "forward", "export")
     )
     off_channel = personal_channel or email_destination
+    direct_to_caller = any(
+        p in clean for p in (
+            "send me", "pay me", "transfer to me", "wire to me",
+            "send to me", "to fix it", "gift card", "crypto", "bitcoin",
+        )
+    )
     new_account = (
         "new account" in clean
         or "different account" in clean
         or "new bank account" in clean
         or (intent == "financial_request" and "this account" in clean)
+        or (intent == "financial_request" and direct_to_caller)
     )
     sensitive_doc = bool(grouped.get("DOCUMENT")) and any(
         x in clean for x in ("database", "kyc", "salary", "payroll", "confidential")
     )
     financial = intent == "financial_request"
     credential = intent == "credential_request"
-    authority = bool(grouped.get("PERSON_ROLE")) or "calling from" in clean
+    authority = (
+        bool(grouped.get("PERSON_ROLE"))
+        or "calling from" in clean
+        or any(x in clean for x in ("from microsoft", "from apple", "from google", "from amazon", "tech support", "apple support", "microsoft support", "police"))
+    )
 
     prior_intents = state.get("intents") or []
     prior_sensitive = any(i in SENSITIVE_INTENTS for i in prior_intents[-3:])

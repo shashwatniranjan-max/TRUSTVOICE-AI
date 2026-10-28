@@ -89,8 +89,13 @@ NEGATION_WINDOW = re.compile(
 )
 
 FINANCIAL_TRANSFER = re.compile(
-    r"\b(transfer|wire|neft|imps|send (the )?money|send ₹|send rs)\b.{0,60}"
-    r"\b(to (this|the new|my personal|a new)|to account)\b",
+    r"(?:"
+    r"\b(?:transfer|wire|neft|imps|send (?:the )?money|send\s*[\$₹€£]|send rs)\b.{0,60}"
+    r"\b(?:to (?:this|the new|my personal|a new|me)|to account)\b|"
+    r"\b(?:send|transfer|wire|pay)\s+(?:me\s+|us\s+)?(?:[\$₹€£]\s*\d+|\d+\s*(?:dollars?|usd|rupees?|rs|euros?)|money|funds|cash)\b|"
+    r"\b(?:send|pay|transfer|wire)\b.{0,40}\b(?:[\$₹€£]\s*\d+|\d+\s*(?:dollars?|usd|rupees?)|money|funds)\b.{0,40}\b(?:to fix|to unlock|to remove|fee|charge)\b|"
+    r"\b(?:need to|have to|must)\s+(?:send|pay|transfer|wire)\s+(?:me\s+)?(?:[\$₹€£]|\d+|money|funds)\b"
+    r")",
     re.I,
 )
 
