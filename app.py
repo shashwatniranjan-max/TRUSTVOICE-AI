@@ -41,6 +41,12 @@ NAV_GROUPS = (
         ),
     ),
     (
+        "BENCHMARKING",
+        (
+            ("Model Benchmarks", "nav_Evaluation", "Model Benchmarks", ":material/analytics:"),
+        ),
+    ),
+    (
         "SYSTEM",
         (
             ("Settings", "nav_Settings", "Settings", ":material/settings:"),
@@ -213,7 +219,7 @@ elif nav == "Incidents":
     render_incidents()
 elif nav == "Settings":
     render_settings()
-elif nav in {"Evaluation Lab", "Evaluation"}:
+elif nav in {"Model Benchmarks", "Evaluation Lab", "Evaluation"}:
     render_evaluation()
 else:
     # Fallback — redirect to Overview
